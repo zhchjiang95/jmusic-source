@@ -39,6 +39,9 @@ A new Flutter FFI plugin project.
     'DEFINES_MODULE' => 'YES',
     # Flutter.framework does not contain a i386 slice.
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
-    'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/librust_lib_jmusic.a',
+    # -force_load 加载 Rust 静态库，同时链接 Rust 依赖所需的系统框架：
+    # - SystemConfiguration / CoreFoundation: reqwest 的代理检测
+    # - AudioToolbox / AudioUnit / CoreAudio: rodio 的音频播放
+    'OTHER_LDFLAGS' => '-force_load ${BUILT_PRODUCTS_DIR}/librust_lib_jmusic.a -framework SystemConfiguration -framework CoreFoundation -framework AudioToolbox -framework AudioUnit -framework CoreAudio',
   }
 end

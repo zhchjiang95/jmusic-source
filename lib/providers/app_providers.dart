@@ -286,7 +286,8 @@ class LibraryState {
 class LibraryNotifier extends Notifier<LibraryState> {
   @override
   LibraryState build() {
-    _loadLibrary();
+    // 延迟加载，确保 build() 先返回初始状态后再操作 state
+    Future.microtask(() => _loadLibrary());
     return const LibraryState();
   }
 

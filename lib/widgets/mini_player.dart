@@ -10,18 +10,12 @@ class MiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(playerProvider);
+    // 只监听歌曲信息和播放状态，不监听 position 等高频变化字段
+    final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
+    final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
     final theme = Theme.of(context);
 
-    if (state.currentSong == null) return const SizedBox.shrink();
-
-    // 进度条进度
-    final progress = state.duration.inMilliseconds > 0
-        ? (state.position.inMilliseconds / state.duration.inMilliseconds).clamp(
-            0.0,
-            1.0,
-          )
-        : 0.0;
+    if (currentSong == null) return const SizedBox.shrink();
 
     return GestureDetector(
       onTap: () {
@@ -49,6 +43,7 @@ class MiniPlayer extends ConsumerWidget {
       },
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: const Color(0xFF1E1E2E),
           borderRadius: BorderRadius.circular(16),
@@ -60,56 +55,79 @@ class MiniPlayer extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 进度条（顶部细线）
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
-              ),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 2,
-                backgroundColor: Colors.transparent,
-                valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
-              ),
+            // 进度条（独立 Consumer 避免重建整个组件）
+            Consumer(
+              builder: (context, ref, _) {
+                final position = ref.watch(
+                  playerProvider.select((s) => s.position),
+                );
+                final duration = ref.watch(
+                  playerProvider.select((s) => s.duration),
+                );
+                final progress = duration.inMilliseconds > 0
+                    ? (position.inMilliseconds / duration.inMilliseconds).clamp(
+                        0.0,
+                        1.0,
+                      )
+                    : 0.0;
+                return LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 2,
+                  backgroundColor: Colors.transparent,
+                  valueColor: AlwaysStoppedAnimation(theme.colorScheme.primary),
+                );
+              },
             ),
             // 内容
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
               child: Row(
                 children: [
-                  // 小封面
+                  // 封面（独立 Consumer，只在 coverData 变化时重建）
                   Hero(
                     tag: 'album_art',
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary.withValues(alpha: 0.5),
-                            theme.colorScheme.tertiary.withValues(alpha: 0.5),
-                          ],
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: state.coverData != null
-                            ? Image.memory(
-                                Uint8List.fromList(state.coverData!),
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.music_note,
-                                  color: Colors.white54,
-                                  size: 22,
+                    child: Consumer(
+                      builder: (context, ref, _) {
+                        final coverData = ref.watch(
+                          playerProvider.select((s) => s.coverData),
+                        );
+                        return Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            gradient: LinearGradient(
+                              colors: [
+                                theme.colorScheme.primary.withValues(
+                                  alpha: 0.5,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.music_note,
-                                color: Colors.white54,
-                                size: 22,
-                              ),
-                      ),
+                                theme.colorScheme.tertiary.withValues(
+                                  alpha: 0.5,
+                                ),
+                              ],
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: coverData != null
+                                ? Image.memory(
+                                    Uint8List.fromList(coverData),
+                                    fit: BoxFit.cover,
+                                    gaplessPlayback: true,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.music_note,
+                                      color: Colors.white54,
+                                      size: 22,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.music_note,
+                                    color: Colors.white54,
+                                    size: 22,
+                                  ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -120,7 +138,7 @@ class MiniPlayer extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          state.currentSong?.title ?? '',
+                          currentSong.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -130,7 +148,7 @@ class MiniPlayer extends ConsumerWidget {
                           ),
                         ),
                         Text(
-                          state.currentSong?.artist ?? '',
+                          currentSong.artist,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -146,7 +164,7 @@ class MiniPlayer extends ConsumerWidget {
                     onPressed: () =>
                         ref.read(playerProvider.notifier).togglePlayPause(),
                     icon: Icon(
-                      state.isPlaying
+                      isPlaying
                           ? Icons.pause_rounded
                           : Icons.play_arrow_rounded,
                       color: Colors.white,
