@@ -28,13 +28,23 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
   void _scrollToLine(int index, int totalLines) {
     if (!_scrollController.hasClients || index < 0) return;
 
-    // 计算目标偏移量，将当前行居中显示
+    // ListView 有 padding，内容区从 padding.top 开始
+    // maxScrollExtent 已包含 padding 的影响
+    // index * _itemHeight 是该行相对于内容区顶部的偏移
+    // 加上顶部 padding 后再减半个视口使其居中
+    final topPadding = _scrollController.position.maxScrollExtent > 0
+        ? (_scrollController.position.maxScrollExtent -
+                  (totalLines * _itemHeight -
+                      _scrollController.position.viewportDimension)) /
+              2
+        : 0.0;
     final viewportHeight = _scrollController.position.viewportDimension;
     final targetOffset =
-        (index * _itemHeight - viewportHeight / 2 + _itemHeight / 2).clamp(
-          0.0,
-          _scrollController.position.maxScrollExtent,
-        );
+        (topPadding +
+                index * _itemHeight -
+                viewportHeight / 2 +
+                _itemHeight / 2)
+            .clamp(0.0, _scrollController.position.maxScrollExtent);
 
     _scrollController.animateTo(
       targetOffset,
@@ -105,53 +115,58 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
           ),
           const SizedBox(height: 16),
         ],
-        // 歌词列表
+        // 歌词列表（隐藏滚动条）
         Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 全屏模式时，上下留半个视口高度，使首尾行也能居中
-              final verticalPad = widget.isFullScreen
-                  ? constraints.maxHeight / 2 - _itemHeight / 2
-                  : 8.0;
-              return ListView.builder(
-                controller: _scrollController,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: verticalPad,
-                ),
-                itemCount: lyrics.lines.length,
-                itemExtent: _itemHeight,
-                itemBuilder: (context, index) {
-                  final line = lyrics.lines[index];
-                  final isCurrentLine = index == currentLineIndex;
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(scrollbars: false),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // 全屏模式时，上下留半个视口高度，使首尾行也能居中
+                final verticalPad = widget.isFullScreen
+                    ? constraints.maxHeight / 2 - _itemHeight / 2
+                    : 8.0;
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: verticalPad,
+                  ),
+                  itemCount: lyrics.lines.length,
+                  itemExtent: _itemHeight,
+                  itemBuilder: (context, index) {
+                    final line = lyrics.lines[index];
+                    final isCurrentLine = index == currentLineIndex;
 
-                  return AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 300),
-                    style: TextStyle(
-                      fontSize: isCurrentLine
-                          ? (widget.isFullScreen ? 20 : 18)
-                          : (widget.isFullScreen ? 16 : 15),
-                      fontWeight: isCurrentLine
-                          ? FontWeight.bold
-                          : FontWeight.normal,
-                      color: isCurrentLine
-                          ? theme.colorScheme.primary
-                          : Colors.white.withValues(alpha: 0.35),
-                      height: 1.5,
-                    ),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        line.text,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
+                    return AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 300),
+                      style: TextStyle(
+                        fontSize: isCurrentLine
+                            ? (widget.isFullScreen ? 20 : 18)
+                            : (widget.isFullScreen ? 16 : 15),
+                        fontWeight: isCurrentLine
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                        color: isCurrentLine
+                            ? theme.colorScheme.primary
+                            : Colors.white.withValues(alpha: 0.35),
+                        height: 1.5,
                       ),
-                    ),
-                  );
-                },
-              );
-            },
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          line.text,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],

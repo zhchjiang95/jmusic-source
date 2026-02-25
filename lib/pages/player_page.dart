@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
@@ -17,48 +18,62 @@ class PlayerPage extends ConsumerWidget {
     final volume = ref.watch(playerProvider.select((s) => s.volume));
     final hasLyrics = ref.watch(playerProvider.select((s) => s.lyrics != null));
     final theme = Theme.of(context);
+    final notifier = ref.read(playerProvider.notifier);
 
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.3),
-              const Color(0xFF121212),
-              const Color(0xFF0A0A0A),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 顶部导航栏
-              _buildAppBar(context, ref, hasLyrics),
-              const SizedBox(height: 20),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.space): () =>
+            notifier.togglePlayPause(),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            notifier.next(),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            notifier.previous(),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  theme.colorScheme.primary.withValues(alpha: 0.3),
+                  const Color(0xFF121212),
+                  const Color(0xFF0A0A0A),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // 顶部导航栏
+                  _buildAppBar(context, ref, hasLyrics),
+                  const SizedBox(height: 20),
 
-              // 专辑封面（独立 Consumer）
-              Expanded(flex: 5, child: _buildAlbumArt(theme)),
+                  // 专辑封面（独立 Consumer）
+                  Expanded(flex: 5, child: _buildAlbumArt(theme)),
 
-              const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-              // 歌曲信息
-              _buildSongInfo(currentSong, theme),
-              const SizedBox(height: 12),
+                  // 歌曲信息
+                  _buildSongInfo(currentSong, theme),
+                  const SizedBox(height: 12),
 
-              // 歌词预览（两行）
-              _buildLyricsPreview(theme),
-              const SizedBox(height: 12),
+                  // 歌词预览（两行）
+                  _buildLyricsPreview(theme),
+                  const SizedBox(height: 12),
 
-              // 进度条（独立 Consumer）
-              _buildProgressBar(context, ref, theme),
-              const SizedBox(height: 16),
+                  // 进度条（独立 Consumer）
+                  _buildProgressBar(context, ref, theme),
+                  const SizedBox(height: 16),
 
-              // 播放控制按钮
-              _buildControls(ref, isPlaying, playMode, volume, theme),
-              const SizedBox(height: 20),
-            ],
+                  // 播放控制按钮
+                  _buildControls(ref, isPlaying, playMode, volume, theme),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -430,112 +445,131 @@ class _FullScreenLyricsPage extends ConsumerWidget {
     final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
     final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
     final theme = Theme.of(context);
+    final notifier = ref.read(playerProvider.notifier);
 
-    return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.2),
-              const Color(0xFF121212),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // 顶部栏
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white70),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentSong?.title ?? '',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            currentSong?.artist ?? '',
-                            style: const TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.space): () =>
+            notifier.togglePlayPause(),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            notifier.next(),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            notifier.previous(),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  theme.colorScheme.primary.withValues(alpha: 0.2),
+                  const Color(0xFF121212),
+                ],
               ),
-              const SizedBox(height: 8),
-              // 歌词滚动区域
-              const Expanded(child: LyricsView(isFullScreen: true)),
-              // 底部简化控制栏
-              Padding(
-                padding: const EdgeInsets.fromLTRB(32, 8, 32, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      onPressed: () =>
-                          ref.read(playerProvider.notifier).previous(),
-                      icon: const Icon(
-                        Icons.skip_previous_rounded,
-                        color: Colors.white70,
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: theme.colorScheme.primary,
-                      ),
-                      child: IconButton(
-                        onPressed: () =>
-                            ref.read(playerProvider.notifier).togglePlayPause(),
-                        icon: Icon(
-                          isPlaying
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 28,
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // 顶部栏
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(
+                            Icons.arrow_back,
+                            color: Colors.white70,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentSong?.title ?? '',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                currentSong?.artist ?? '',
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 24),
-                    IconButton(
-                      onPressed: () => ref.read(playerProvider.notifier).next(),
-                      icon: const Icon(
-                        Icons.skip_next_rounded,
-                        color: Colors.white70,
-                        size: 32,
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  // 歌词滚动区域
+                  const Expanded(child: LyricsView(isFullScreen: true)),
+                  // 底部简化控制栏
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(32, 8, 32, 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          onPressed: () =>
+                              ref.read(playerProvider.notifier).previous(),
+                          icon: const Icon(
+                            Icons.skip_previous_rounded,
+                            color: Colors.white70,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: theme.colorScheme.primary,
+                          ),
+                          child: IconButton(
+                            onPressed: () => ref
+                                .read(playerProvider.notifier)
+                                .togglePlayPause(),
+                            icon: Icon(
+                              isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 24),
+                        IconButton(
+                          onPressed: () =>
+                              ref.read(playerProvider.notifier).next(),
+                          icon: const Icon(
+                            Icons.skip_next_rounded,
+                            color: Colors.white70,
+                            size: 32,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -101,7 +101,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     try {
       rust_player.playerInit();
     } catch (e) {
-      // 引擎初始化失败
+      print('音频引擎初始化失败: $e');
     }
   }
 
@@ -296,6 +296,10 @@ class LibraryNotifier extends Notifier<LibraryState> {
     try {
       final library = rust_scanner.getLibrary();
       state = state.copyWith(songs: library.songs);
+      // 同步播放列表到 PlayerNotifier
+      if (library.songs.isNotEmpty) {
+        ref.read(playerProvider.notifier).setPlaylist(library.songs);
+      }
     } catch (e) {
       state = state.copyWith(error: '加载歌曲库失败: $e');
     }
