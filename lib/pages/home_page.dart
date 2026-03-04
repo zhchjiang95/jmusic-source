@@ -381,131 +381,142 @@ class _HomePageState extends ConsumerState<HomePage> {
                     // 在原始列表中找到真实索引用于播放
                     final realIndex = libraryState.songs.indexOf(song);
 
-                    return Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          ref
-                              .read(playerProvider.notifier)
-                              .setPlaylist(libraryState.songs);
-                          ref
-                              .read(playerProvider.notifier)
-                              .playSongAt(realIndex);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: isCurrentSong
-                                ? theme.colorScheme.primary.withValues(
-                                    alpha: 0.12,
-                                  )
-                                : null,
-                          ),
-                          child: Row(
-                            children: [
-                              // 序号 / 播放指示
-                              SizedBox(
-                                width: 36,
-                                child: isCurrentSong
-                                    ? Icon(
-                                        Icons.equalizer,
-                                        color: theme.colorScheme.primary,
-                                        size: 16,
-                                      )
-                                    : Text(
-                                        '${index + 1}',
+                    return GestureDetector(
+                      onSecondaryTapUp: (details) {
+                        _showContextMenu(
+                          context,
+                          ref,
+                          details.globalPosition,
+                          song,
+                        );
+                      },
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            ref
+                                .read(playerProvider.notifier)
+                                .setPlaylist(libraryState.songs);
+                            ref
+                                .read(playerProvider.notifier)
+                                .playSongAt(realIndex);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              color: isCurrentSong
+                                  ? theme.colorScheme.primary.withValues(
+                                      alpha: 0.12,
+                                    )
+                                  : null,
+                            ),
+                            child: Row(
+                              children: [
+                                // 序号 / 播放指示
+                                SizedBox(
+                                  width: 36,
+                                  child: isCurrentSong
+                                      ? Icon(
+                                          Icons.equalizer,
+                                          color: theme.colorScheme.primary,
+                                          size: 16,
+                                        )
+                                      : Text(
+                                          '${index + 1}',
+                                          style: TextStyle(
+                                            color: dimColor,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                ),
+                                // 标题 + 歌手
+                                Expanded(
+                                  flex: 4,
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        song.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: dimColor,
+                                          color: isCurrentSong
+                                              ? theme.colorScheme.primary
+                                              : theme.colorScheme.onSurface,
+                                          fontWeight: isCurrentSong
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
                                           fontSize: 13,
+                                          height: 1.2,
                                         ),
                                       ),
-                              ),
-                              // 标题 + 歌手
-                              Expanded(
-                                flex: 4,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      song.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: isCurrentSong
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.onSurface,
-                                        fontWeight: isCurrentSong
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                        fontSize: 13,
-                                        height: 1.2,
+                                      Text(
+                                        song.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: dimColor,
+                                          fontSize: 11,
+                                          height: 1.2,
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                // 专辑
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    song.album.isNotEmpty ? song.album : '-',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: dimColor,
+                                      fontSize: 12,
                                     ),
-                                    Text(
-                                      song.artist,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: dimColor,
-                                        fontSize: 11,
-                                        height: 1.2,
-                                      ),
+                                  ),
+                                ),
+                                // 文件大小
+                                SizedBox(
+                                  width: 60,
+                                  child: Text(
+                                    _formatFileSize(song.fileSize.toInt()),
+                                    style: TextStyle(
+                                      color: dimColor,
+                                      fontSize: 12,
                                     ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // 专辑
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  song.album.isNotEmpty ? song.album : '-',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: dimColor,
-                                    fontSize: 12,
                                   ),
                                 ),
-                              ),
-                              // 文件大小
-                              SizedBox(
-                                width: 60,
-                                child: Text(
-                                  _formatFileSize(song.fileSize.toInt()),
-                                  style: TextStyle(
-                                    color: dimColor,
-                                    fontSize: 12,
+                                // 格式
+                                SizedBox(
+                                  width: 50,
+                                  child: Text(
+                                    song.format.toUpperCase(),
+                                    style: TextStyle(
+                                      color: dimColor,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              // 格式
-                              SizedBox(
-                                width: 50,
-                                child: Text(
-                                  song.format.toUpperCase(),
-                                  style: TextStyle(
-                                    color: dimColor,
-                                    fontSize: 12,
+                                // 时长
+                                SizedBox(
+                                  width: 48,
+                                  child: Text(
+                                    _formatDuration(song.duration),
+                                    style: TextStyle(
+                                      color: dimColor,
+                                      fontSize: 12,
+                                    ),
+                                    textAlign: TextAlign.right,
                                   ),
                                 ),
-                              ),
-                              // 时长
-                              SizedBox(
-                                width: 48,
-                                child: Text(
-                                  _formatDuration(song.duration),
-                                  style: TextStyle(
-                                    color: dimColor,
-                                    fontSize: 12,
-                                  ),
-                                  textAlign: TextAlign.right,
-                                ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -514,6 +525,153 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
         ),
       ],
+    );
+  }
+
+  /// 右键菜单
+  void _showContextMenu(
+    BuildContext context,
+    WidgetRef ref,
+    Offset position,
+    Song song,
+  ) {
+    final theme = Theme.of(context);
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx,
+        position.dy,
+      ),
+      color: const Color(0xFF2A2A3E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      items: [
+        PopupMenuItem(
+          value: 'edit',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.edit, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('编辑信息', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'edit') {
+        _showEditDialog(context, ref, song);
+      }
+    });
+  }
+
+  /// 编辑歌曲信息对话框
+  void _showEditDialog(BuildContext context, WidgetRef ref, Song song) {
+    final titleCtrl = TextEditingController(text: song.title);
+    final artistCtrl = TextEditingController(text: song.artist);
+    final albumCtrl = TextEditingController(text: song.album);
+    final theme = Theme.of(context);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          '编辑歌曲信息',
+          style: TextStyle(color: theme.colorScheme.onSurface, fontSize: 16),
+        ),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTextField('标题', titleCtrl, theme),
+              const SizedBox(height: 12),
+              _buildTextField('歌手', artistCtrl, theme),
+              const SizedBox(height: 12),
+              _buildTextField('专辑', albumCtrl, theme),
+              const SizedBox(height: 8),
+              // 文件路径提示
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  song.filePath.split('/').last,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              '取消',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await ref
+                    .read(libraryProvider.notifier)
+                    .updateSongInfo(
+                      filePath: song.filePath,
+                      title: titleCtrl.text.trim(),
+                      artist: artistCtrl.text.trim(),
+                      album: albumCtrl.text.trim(),
+                    );
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+                }
+              }
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 构建编辑字段
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller,
+    ThemeData theme,
+  ) {
+    return TextField(
+      controller: controller,
+      style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(
+          fontSize: 13,
+          color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+        ),
+        filled: true,
+        fillColor: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+      ),
     );
   }
 

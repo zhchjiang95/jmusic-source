@@ -19,3 +19,41 @@ Future<Library> scanAndUpdateLibrary({required String dirPath}) =>
 
 /// 获取当前歌曲库
 Library getLibrary() => RustLib.instance.api.crateApiScannerGetLibrary();
+
+/// 更新歌曲元数据（写入文件标签 + 更新本地歌曲库）
+Future<void> updateSongMetadata({
+  required String filePath,
+  required String title,
+  required String artist,
+  required String album,
+}) => RustLib.instance.api.crateApiScannerUpdateSongMetadata(
+  filePath: filePath,
+  title: title,
+  artist: artist,
+  album: album,
+);
+
+/// 读取文件中嵌入的封面图
+Future<Uint8List?> readEmbeddedCover({required String filePath}) =>
+    RustLib.instance.api.crateApiScannerReadEmbeddedCover(filePath: filePath);
+
+/// 读取文件中嵌入的歌词文本
+Future<String?> readEmbeddedLyrics({required String filePath}) =>
+    RustLib.instance.api.crateApiScannerReadEmbeddedLyrics(filePath: filePath);
+
+/// 将所有信息（标题/歌手/专辑/歌词/封面）写入源文件
+Future<void> saveAllMetadata({
+  required String filePath,
+  required String title,
+  required String artist,
+  required String album,
+  String? lyricsText,
+  Uint8List? coverData,
+}) => RustLib.instance.api.crateApiScannerSaveAllMetadata(
+  filePath: filePath,
+  title: title,
+  artist: artist,
+  album: album,
+  lyricsText: lyricsText,
+  coverData: coverData,
+);

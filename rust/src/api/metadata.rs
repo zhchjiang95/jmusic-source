@@ -53,3 +53,9 @@ pub fn get_cover_cache_path(albummid: String) -> Option<String> {
 pub fn get_cover_url(albummid: String) -> String {
     qq_music::get_cover_url(&albummid)
 }
+
+/// 解析 LRC 文本为 Lyrics 结构
+#[flutter_rust_bridge::frb(sync)]
+pub fn parse_lrc_text(lrc_text: String) -> Lyrics {
+    Lyrics::parse_lrc(&lrc_text)
+}

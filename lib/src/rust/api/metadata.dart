@@ -27,3 +27,7 @@ String? getCoverCachePath({required String albummid}) =>
 /// 获取封面 URL（不下载）
 String getCoverUrl({required String albummid}) =>
     RustLib.instance.api.crateApiMetadataGetCoverUrl(albummid: albummid);
+
+/// 解析 LRC 文本为 Lyrics 结构
+Lyrics parseLrcText({required String lrcText}) =>
+    RustLib.instance.api.crateApiMetadataParseLrcText(lrcText: lrcText);

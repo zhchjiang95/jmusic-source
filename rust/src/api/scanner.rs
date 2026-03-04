@@ -157,3 +157,165 @@ pub fn scan_and_update_library(dir_path: String) -> Result<Library, String> {
 pub fn get_library() -> Library {
     load_library()
 }
+
+/// 更新歌曲元数据（写入文件标签 + 更新本地歌曲库）
+#[flutter_rust_bridge::frb]
+pub fn update_song_metadata(
+    file_path: String,
+    title: String,
+    artist: String,
+    album: String,
+) -> Result<(), String> {
+    use lofty::config::WriteOptions;
+    use lofty::tag::{Accessor, TagExt};
+    use std::path::Path;
+
+    let path = Path::new(&file_path);
+
+    // 用 lofty 打开文件并写入标签
+    let mut tagged_file = Probe::open(path)
+        .map_err(|e| format!("无法打开文件: {}", e))?
+        .read()
+        .map_err(|e| format!("无法读取文件: {}", e))?;
+
+    // 获取或创建主标签
+    let tag = match tagged_file.primary_tag_mut() {
+        Some(t) => t,
+        None => {
+            // 根据文件类型插入合适的标签
+            let tag_type = tagged_file.primary_tag_type();
+            tagged_file.insert_tag(lofty::tag::Tag::new(tag_type));
+            tagged_file.primary_tag_mut().unwrap()
+        }
+    };
+
+    // 设置标签字段
+    tag.set_title(title.clone());
+    tag.set_artist(artist.clone());
+    tag.set_album(album.clone());
+
+    // 写入到文件
+    tag.save_to_path(path, WriteOptions::default())
+        .map_err(|e| format!("写入标签失败: {}", e))?;
+
+    // 更新歌曲库中对应歌曲的信息
+    let mut library = load_library();
+    if let Some(song) = library.songs.iter_mut().find(|s| s.file_path == file_path) {
+        song.title = title;
+        song.artist = artist;
+        song.album = album;
+    }
+    save_library(&library)?;
+
+    Ok(())
+}
+
+/// 读取文件中嵌入的封面图
+#[flutter_rust_bridge::frb]
+pub fn read_embedded_cover(file_path: String) -> Option<Vec<u8>> {
+    use std::path::Path;
+
+    let path = Path::new(&file_path);
+    let tagged_file = Probe::open(path).ok()?.read().ok()?;
+    let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag())?;
+
+    tag.pictures().first().map(|pic| pic.data().to_vec())
+}
+
+/// 读取文件中嵌入的歌词文本
+#[flutter_rust_bridge::frb]
+pub fn read_embedded_lyrics(file_path: String) -> Option<String> {
+    use lofty::tag::ItemKey;
+    use std::path::Path;
+
+    let path = Path::new(&file_path);
+    let tagged_file = Probe::open(path).ok()?.read().ok()?;
+    let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag())?;
+
+    tag.get_string(&ItemKey::Lyrics)
+        .map(|s| s.to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// 将所有信息（标题/歌手/专辑/歌词/封面）写入源文件
+#[flutter_rust_bridge::frb]
+pub fn save_all_metadata(
+    file_path: String,
+    title: String,
+    artist: String,
+    album: String,
+    lyrics_text: Option<String>,
+    cover_data: Option<Vec<u8>>,
+) -> Result<(), String> {
+    save_all_metadata_impl(file_path, title, artist, album, lyrics_text, cover_data)
+}
+
+/// 实际写入逻辑（独立函数避免 FRB 宏干扰类型推断）
+fn save_all_metadata_impl(
+    file_path: String,
+    title: String,
+    artist: String,
+    album: String,
+    lyrics_text: Option<String>,
+    cover_data: Option<Vec<u8>>,
+) -> Result<(), String> {
+    use lofty::config::WriteOptions;
+    use lofty::picture::{MimeType, Picture, PictureType};
+    use lofty::tag::{Accessor, ItemKey, ItemValue, TagExt, TagItem};
+    use std::path::Path;
+
+    let path = Path::new(&file_path);
+
+    let mut tagged_file = Probe::open(path)
+        .map_err(|e| format!("无法打开文件: {}", e))?
+        .read()
+        .map_err(|e| format!("无法读取文件: {}", e))?;
+
+    let tag = match tagged_file.primary_tag_mut() {
+        Some(t) => t,
+        None => {
+            let tag_type = tagged_file.primary_tag_type();
+            tagged_file.insert_tag(lofty::tag::Tag::new(tag_type));
+            tagged_file.primary_tag_mut().unwrap()
+        }
+    };
+
+    // 基本信息
+    tag.set_title(title.clone());
+    tag.set_artist(artist.clone());
+    tag.set_album(album.clone());
+
+    // 歌词
+    if let Some(lrc) = &lyrics_text {
+        tag.insert(TagItem::new(ItemKey::Lyrics, ItemValue::Text(lrc.clone())));
+    }
+
+    // 封面图
+    if let Some(data) = &cover_data {
+        tag.remove_picture_type(PictureType::CoverFront);
+        let mime = if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+            MimeType::Png
+        } else {
+            MimeType::Jpeg
+        };
+        let pic = Picture::new_unchecked(
+            PictureType::CoverFront, Some(mime), None, data.clone(),
+        );
+        tag.push_picture(pic);
+    }
+
+    tag.save_to_path(path, WriteOptions::default())
+        .map_err(|e| format!("写入标签失败: {}", e))?;
+
+    // 更新歌曲库
+    let mut library = load_library();
+    if let Some(song) = library.songs.iter_mut().find(|s| s.file_path == file_path) {
+        song.title = title;
+        song.artist = artist;
+        song.album = album;
+    }
+    save_library(&library)?;
+
+    Ok(())
+}
+

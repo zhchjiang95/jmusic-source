@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/src/rust/api/player.dart' as rust_player;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
@@ -29,6 +30,7 @@ class PlayerState {
   final Duration position;
   final Duration duration;
   final Lyrics? lyrics;
+  final String? lrcText; // 原始 LRC 文本（用于保存到文件）
   final List<int>? coverData;
   final bool isLoading;
 
@@ -42,6 +44,7 @@ class PlayerState {
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.lyrics,
+    this.lrcText,
     this.coverData,
     this.isLoading = false,
   });
@@ -56,6 +59,7 @@ class PlayerState {
     Duration? position,
     Duration? duration,
     Lyrics? lyrics,
+    String? lrcText,
     List<int>? coverData,
     bool? isLoading,
     bool clearLyrics = false,
@@ -72,6 +76,7 @@ class PlayerState {
       position: position ?? this.position,
       duration: duration ?? this.duration,
       lyrics: clearLyrics ? null : (lyrics ?? this.lyrics),
+      lrcText: clearLyrics ? null : (lrcText ?? this.lrcText),
       coverData: clearCover ? null : (coverData ?? this.coverData),
       isLoading: isLoading ?? this.isLoading,
     );
@@ -178,32 +183,94 @@ class PlayerNotifier extends Notifier<PlayerState> {
     }
   }
 
-  /// 异步获取在线歌曲信息（歌词和封面）
+  /// 获取歌曲信息：优先读源文件嵌入数据，无则在线获取
   Future<void> _fetchOnlineInfo(Song song) async {
+    bool hasLyrics = false;
+    bool hasCover = false;
+
+    // —— 先读源文件嵌入数据 ——
     try {
-      final keyword = '${song.artist} ${song.title}';
-      final results = await rust_metadata.searchSongOnline(keyword: keyword);
+      final embeddedCover = await rust_scanner.readEmbeddedCover(
+        filePath: song.filePath,
+      );
+      if (embeddedCover != null &&
+          state.currentSong?.filePath == song.filePath) {
+        state = state.copyWith(coverData: embeddedCover);
+        hasCover = true;
+      }
+    } catch (_) {}
+
+    try {
+      final embeddedLrc = await rust_scanner.readEmbeddedLyrics(
+        filePath: song.filePath,
+      );
+      if (embeddedLrc != null && state.currentSong?.filePath == song.filePath) {
+        final lyrics = rust_metadata.parseLrcText(lrcText: embeddedLrc);
+        state = state.copyWith(lyrics: lyrics, lrcText: embeddedLrc);
+        hasLyrics = true;
+      }
+    } catch (_) {}
+
+    // 如果嵌入数据已齐全，无需在线获取
+    if (hasLyrics && hasCover) return;
+
+    // —— 在线获取缺失的数据 ——
+    try {
+      var results = await rust_metadata.searchSongOnline(
+        keyword: '${song.artist} ${song.title}',
+      );
+      if (results.isEmpty) {
+        results = await rust_metadata.searchSongOnline(keyword: song.title);
+      }
 
       if (results.isNotEmpty) {
         final match = results.first;
 
-        // 获取歌词
-        try {
-          final lyrics = await rust_metadata.getLyrics(songmid: match.songmid);
-          if (state.currentSong?.filePath == song.filePath) {
-            state = state.copyWith(lyrics: lyrics);
-          }
-        } catch (_) {}
+        // 用在线信息补全/更新当前歌曲的基本信息
+        if (state.currentSong?.filePath == song.filePath) {
+          final oldSong = state.currentSong!;
+          final artistName = match.singer.isNotEmpty
+              ? match.singer.map((s) => s.name).join('/')
+              : oldSong.artist;
 
-        // 获取封面
-        try {
-          final coverData = await rust_metadata.getCover(
+          final updatedSong = Song(
+            filePath: oldSong.filePath,
+            title: match.songname.isNotEmpty ? match.songname : oldSong.title,
+            artist: artistName,
+            album: match.albumname.isNotEmpty ? match.albumname : oldSong.album,
+            duration: oldSong.duration,
+            fileSize: oldSong.fileSize,
+            format: oldSong.format,
+            songmid: match.songmid,
             albummid: match.albummid,
+            modifiedAt: oldSong.modifiedAt,
           );
-          if (state.currentSong?.filePath == song.filePath) {
-            state = state.copyWith(coverData: coverData);
-          }
-        } catch (_) {}
+          state = state.copyWith(currentSong: updatedSong);
+        }
+
+        // 歌词（嵌入数据没有时才在线获取）
+        if (!hasLyrics) {
+          try {
+            final lyrics = await rust_metadata.getLyrics(
+              songmid: match.songmid,
+            );
+            if (state.currentSong?.filePath == song.filePath) {
+              state = state.copyWith(lyrics: lyrics);
+            }
+          } catch (_) {}
+        }
+
+        // 封面（嵌入数据没有时才在线获取）
+        if (!hasCover) {
+          try {
+            final coverData = await rust_metadata.getCover(
+              albummid: match.albummid,
+            );
+            if (state.currentSong?.filePath == song.filePath) {
+              state = state.copyWith(coverData: coverData);
+            }
+          } catch (_) {}
+        }
       }
     } catch (_) {}
   }
@@ -314,6 +381,75 @@ class LibraryNotifier extends Notifier<LibraryState> {
     } catch (e) {
       state = state.copyWith(isScanning: false, error: '扫描失败: $e');
     }
+  }
+
+  /// 更新歌曲元数据（写入文件标签 + 刷新本地状态）
+  Future<void> updateSongInfo({
+    required String filePath,
+    required String title,
+    required String artist,
+    required String album,
+  }) async {
+    // 调用 Rust 端写入文件标签并更新 library.json
+    await rust_scanner.updateSongMetadata(
+      filePath: filePath,
+      title: title,
+      artist: artist,
+      album: album,
+    );
+
+    // 更新本地状态
+    final updatedSongs = state.songs.map((song) {
+      if (song.filePath == filePath) {
+        return Song(
+          filePath: song.filePath,
+          title: title,
+          artist: artist,
+          album: album,
+          duration: song.duration,
+          fileSize: song.fileSize,
+          format: song.format,
+          songmid: song.songmid,
+          albummid: song.albummid,
+          modifiedAt: song.modifiedAt,
+        );
+      }
+      return song;
+    }).toList();
+    state = state.copyWith(songs: updatedSongs);
+
+    // 同步到播放列表
+    ref.read(playerProvider.notifier).setPlaylist(updatedSongs);
+  }
+
+  /// 完整保存歌曲信息、歌词和封面，并刷新本地状态
+  Future<void> saveAllMetadataAndUpdate({
+    required Song song,
+    String? lyricsText,
+    List<int>? coverData,
+  }) async {
+    // 调用 Rust 端写入文件标签并更新 library.json
+    await rust_scanner.saveAllMetadata(
+      filePath: song.filePath,
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      lyricsText: lyricsText,
+      coverData: coverData != null ? Uint8List.fromList(coverData) : null,
+    );
+
+    // 更新本地状态（song已经是更新好基本信息的对象）
+    final updatedSongs = state.songs.map((s) {
+      if (s.filePath == song.filePath) {
+        return song;
+      }
+      return s;
+    }).toList();
+
+    state = state.copyWith(songs: updatedSongs);
+
+    // 同步到播放列表
+    ref.read(playerProvider.notifier).setPlaylist(updatedSongs);
   }
 }
 
