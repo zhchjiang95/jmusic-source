@@ -77,6 +77,15 @@ flutter build windows
 flutter build linux
 ```
 
+### 🖼️ 更新应用图标
+
+如果需要更换或更新应用图标，请将新的正方形图标图片放置于根目录的 `assets/icon.png` 下，然后运行以下命令自动生成各平台图标：
+
+```bash
+flutter pub run flutter_launcher_icons
+```
+生成完毕后，如果你正在运行程序，需要停止 (`q`) 然后重新运行 `flutter run -d <platform>` 或构建才能看到新图标！
+
 ## 📄 License
 
 MIT

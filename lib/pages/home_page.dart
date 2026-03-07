@@ -19,12 +19,14 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
 
   @override
   void dispose() {
     _focusNode.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -137,6 +139,57 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                       ),
                     const SizedBox(width: 8),
+                    if (playerState.currentSong != null)
+                      IconButton(
+                        onPressed: () {
+                          final currentSong = playerState.currentSong;
+                          if (currentSong == null) return;
+
+                          void scrollToTarget(int index) {
+                            if (!_scrollController.hasClients) return;
+                            final targetOffset = index * 44.0;
+                            final viewportHeight =
+                                _scrollController.position.viewportDimension;
+                            final maxScroll =
+                                _scrollController.position.maxScrollExtent;
+                            var offset =
+                                targetOffset - viewportHeight / 2 + 22.0;
+                            if (offset < 0) offset = 0;
+                            if (offset > maxScroll) offset = maxScroll;
+
+                            _scrollController.animateTo(
+                              offset,
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          }
+
+                          final index = filteredSongs.indexWhere(
+                            (s) => s.filePath == currentSong.filePath,
+                          );
+                          if (index != -1) {
+                            scrollToTarget(index);
+                          } else {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                            Future.delayed(
+                              const Duration(milliseconds: 100),
+                              () {
+                                final realIndex = libraryState.songs.indexWhere(
+                                  (s) => s.filePath == currentSong.filePath,
+                                );
+                                if (realIndex != -1) scrollToTarget(realIndex);
+                              },
+                            );
+                          }
+                        },
+                        icon: Icon(
+                          Icons.location_on,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                        tooltip: '定位当前播放',
+                      ),
                     IconButton(
                       onPressed: libraryState.isScanning
                           ? null
@@ -371,6 +424,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                 )
               : ListView.builder(
+                  controller: _scrollController,
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   itemCount: songs.length,
                   itemExtent: 44,
