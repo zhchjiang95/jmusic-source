@@ -432,8 +432,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                     final song = songs[index];
                     final isCurrentSong =
                         playerState.currentSong?.filePath == song.filePath;
-                    // 在原始列表中找到真实索引用于播放
-                    final realIndex = libraryState.songs.indexOf(song);
 
                     return GestureDetector(
                       onSecondaryTapUp: (details) {
@@ -451,10 +449,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                           onTap: () {
                             ref
                                 .read(playerProvider.notifier)
-                                .setPlaylist(libraryState.songs);
+                                .setPlaylist(songs);
                             ref
                                 .read(playerProvider.notifier)
-                                .playSongAt(realIndex);
+                                .playSongAt(index);
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),

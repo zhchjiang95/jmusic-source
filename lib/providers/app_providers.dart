@@ -133,13 +133,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
           _playFile(state.currentSong!);
         }
       case PlayMode.sequential:
-        next();
       case PlayMode.shuffle:
-        if (state.playlist.isNotEmpty) {
-          final random =
-              DateTime.now().millisecondsSinceEpoch % state.playlist.length;
-          playSongAt(random);
-        }
+        next();
     }
   }
 
@@ -291,6 +286,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 下一首
   void next() {
     if (state.playlist.isEmpty) return;
+    
+    if (state.playMode == PlayMode.shuffle) {
+      final random = DateTime.now().millisecondsSinceEpoch % state.playlist.length;
+      playSongAt(random);
+      return;
+    }
+    
     int nextIndex = (state.currentIndex + 1) % state.playlist.length;
     playSongAt(nextIndex);
   }
@@ -298,6 +300,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 上一首
   void previous() {
     if (state.playlist.isEmpty) return;
+    
+    if (state.playMode == PlayMode.shuffle) {
+      final random = DateTime.now().millisecondsSinceEpoch % state.playlist.length;
+      playSongAt(random);
+      return;
+    }
+    
     int prevIndex = state.currentIndex - 1;
     if (prevIndex < 0) prevIndex = state.playlist.length - 1;
     playSongAt(prevIndex);

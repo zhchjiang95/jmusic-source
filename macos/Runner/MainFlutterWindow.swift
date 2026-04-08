@@ -8,7 +8,7 @@ class MainFlutterWindow: NSWindow {
 
     // 设置默认窗口大小并居中
     let screenFrame = NSScreen.main?.visibleFrame ?? NSRect.zero
-    let width: CGFloat = 366
+    let width: CGFloat = 410
     let height: CGFloat = 750
     let x = screenFrame.origin.x + (screenFrame.width - width) / 2
     let y = screenFrame.origin.y + (screenFrame.height - height) / 2
