@@ -67,7 +67,7 @@ pub async fn search_song(keyword: &str) -> Result<Vec<QQMusicSearchResult>, Stri
     let client = build_client()?;
     let url = format!(
         "https://c.y.qq.com/soso/fcgi-bin/client_search_cp?w={}&format=json&n=5",
-        urlencoding(keyword)
+        keyword
     );
 
     let resp: SearchResponse = client
@@ -166,21 +166,6 @@ pub async fn download_cover(albummid: &str) -> Result<Vec<u8>, String> {
     Ok(bytes.to_vec())
 }
 
-/// 简单的 URL 编码
-fn urlencoding(s: &str) -> String {
-    let mut result = String::new();
-    for byte in s.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                result.push(byte as char);
-            }
-            _ => {
-                result.push_str(&format!("%{:02X}", byte));
-            }
-        }
-    }
-    result
-}
 
 /// HTML 实体解码（处理 QQ 音乐歌词中的 &#xx; 格式）
 fn html_entity_decode(s: &str) -> String {
