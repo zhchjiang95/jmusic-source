@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -844747681;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -351947782;
 
 // Section: executor
 
@@ -232,6 +232,42 @@ fn wire__crate__api__metadata__get_lyrics_impl(
                 transform_result_sse::<_, String>(
                     (move || async move {
                         let output_ok = crate::api::metadata::get_lyrics(api_songmid).await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__metadata__get_netease_lyrics_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "get_netease_lyrics",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok = crate::api::metadata::get_netease_lyrics(api_id).await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -1181,28 +1217,29 @@ fn pde_ffi_dispatcher_primary_impl(
         1 => wire__crate__api__cache__clear_all_cache_impl(port, ptr, rust_vec_len, data_len),
         2 => wire__crate__api__metadata__get_cover_impl(port, ptr, rust_vec_len, data_len),
         6 => wire__crate__api__metadata__get_lyrics_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        20 => {
+        7 => wire__crate__api__metadata__get_netease_lyrics_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        21 => {
             wire__crate__api__scanner__read_embedded_cover_impl(port, ptr, rust_vec_len, data_len)
         }
-        21 => {
+        22 => {
             wire__crate__api__scanner__read_embedded_lyrics_impl(port, ptr, rust_vec_len, data_len)
         }
-        22 => wire__crate__api__cache__reset_library_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__scanner__save_all_metadata_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__scanner__scan_and_update_library_impl(
+        23 => wire__crate__api__cache__reset_library_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__scanner__save_all_metadata_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__scanner__scan_and_update_library_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        25 => {
+        26 => {
             wire__crate__api__scanner__scan_music_directory_impl(port, ptr, rust_vec_len, data_len)
         }
-        26 => {
+        27 => {
             wire__crate__api__metadata__search_song_online_impl(port, ptr, rust_vec_len, data_len)
         }
-        27 => {
+        28 => {
             wire__crate__api__scanner__update_song_metadata_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -1220,18 +1257,18 @@ fn pde_ffi_dispatcher_sync_impl(
         3 => wire__crate__api__metadata__get_cover_cache_path_impl(ptr, rust_vec_len, data_len),
         4 => wire__crate__api__metadata__get_cover_url_impl(ptr, rust_vec_len, data_len),
         5 => wire__crate__api__scanner__get_library_impl(ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__metadata__parse_lrc_text_impl(ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__player__player_get_current_file_impl(ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__player__player_get_volume_impl(ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__player__player_init_impl(ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__player__player_is_finished_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__player__player_pause_impl(ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__player__player_play_impl(ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__player__player_resume_impl(ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__player__player_seek_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__player__player_set_volume_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__player__player_stop_impl(ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__metadata__parse_lrc_text_impl(ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__player__player_get_current_file_impl(ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__player__player_get_volume_impl(ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__player__player_init_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__player__player_is_finished_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__player__player_pause_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__player__player_play_impl(ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__player__player_resume_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__player__player_seek_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__player__player_set_volume_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__player__player_stop_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

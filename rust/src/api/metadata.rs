@@ -1,6 +1,7 @@
 use crate::models::lyrics::Lyrics;
 use crate::models::song::QQMusicSearchResult;
 use crate::network::qq_music;
+use crate::network::netease;
 use crate::storage::cache;
 
 /// 搜索歌曲信息（通过 QQ 音乐接口）
@@ -23,6 +24,12 @@ pub async fn get_lyrics(songmid: String) -> Result<Lyrics, String> {
     // TODO: 缓存原始 LRC 文本（当前 API 返回的是解析后的结构，后续优化）
 
     Ok(lyrics)
+}
+
+/// 获取网易云歌词
+#[flutter_rust_bridge::frb]
+pub async fn get_netease_lyrics(id: String) -> Result<Lyrics, String> {
+    netease::get_lyrics(&id).await
 }
 
 /// 获取专辑封面（优先从缓存读取，无缓存则在线下载）

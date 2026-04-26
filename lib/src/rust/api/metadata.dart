@@ -16,6 +16,10 @@ Future<List<QQMusicSearchResult>> searchSongOnline({required String keyword}) =>
 Future<Lyrics> getLyrics({required String songmid}) =>
     RustLib.instance.api.crateApiMetadataGetLyrics(songmid: songmid);
 
+/// 获取网易云歌词
+Future<Lyrics> getNeteaseLyrics({required String id}) =>
+    RustLib.instance.api.crateApiMetadataGetNeteaseLyrics(id: id);
+
 /// 获取专辑封面（优先从缓存读取，无缓存则在线下载）
 Future<Uint8List> getCover({required String albummid}) =>
     RustLib.instance.api.crateApiMetadataGetCover(albummid: albummid);

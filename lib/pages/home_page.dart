@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/src/rust/models/song.dart';
-
+import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
 import 'package:jmusic/widgets/mini_player.dart';
 
 /// 主页 - 歌曲库列表
@@ -610,10 +610,27 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
+        PopupMenuItem(
+          value: 'import_lyrics',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(
+                Icons.lyrics_outlined,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              const Text('导入歌词', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
       ],
     ).then((value) {
       if (value == 'edit') {
         _showEditDialog(context, ref, song);
+      } else if (value == 'import_lyrics') {
+        _showImportLyricsDialog(context, ref, song);
       }
     });
   }
@@ -694,6 +711,248 @@ class _HomePageState extends ConsumerState<HomePage> {
             child: const Text('保存'),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 导入歌词对话框
+  void _showImportLyricsDialog(BuildContext context, WidgetRef ref, Song song) {
+    final theme = Theme.of(context);
+    final idController = TextEditingController();
+    final textController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E1E2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.lyrics_outlined,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '导入歌词 - ${song.title}',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 15,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 480,
+              child: DefaultTabController(
+                length: 2,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TabBar(
+                      labelColor: theme.colorScheme.primary,
+                      unselectedLabelColor:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      indicatorColor: theme.colorScheme.primary,
+                      dividerColor: Colors.transparent,
+                      labelStyle: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      tabs: const [Tab(text: '网易云在线'), Tab(text: '手动输入')],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      height: 240,
+                      child: TabBarView(
+                        children: [
+                          // 模式1：网易云在线获取
+                          Builder(
+                            builder: (context) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '请输入网易云音乐歌曲 ID：',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: idController,
+                                  autofocus: true,
+                                  style: const TextStyle(fontSize: 13),
+                                  decoration: InputDecoration(
+                                    hintText: '例如：85625',
+                                    filled: true,
+                                    fillColor: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.06),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                if (isLoading)
+                                  const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                else
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () async {
+                                        String input = idController.text.trim();
+                                        if (input.isEmpty) return;
+
+                                        // 尝试从 URL 中提取 ID
+                                        String finalId = input;
+                                        if (input.contains('id=')) {
+                                          try {
+                                            final uri = Uri.parse(input);
+                                            final idFromQuery =
+                                                uri.queryParameters['id'];
+                                            if (idFromQuery != null) {
+                                              finalId = idFromQuery;
+                                            }
+                                          } catch (_) {
+                                            // 解析失败则按原样处理
+                                          }
+                                        }
+
+                                        setDialogState(() => isLoading = true);
+                                        try {
+                                          final lrc = await rust_metadata
+                                              .getNeteaseLyrics(id: finalId);
+
+                                          final buffer = StringBuffer();
+                                          for (final line in lrc.lines) {
+                                            final totalMs = line.timeMs.toInt();
+                                            final minutes = totalMs ~/ 60000;
+                                            final seconds =
+                                                (totalMs % 60000) / 1000;
+                                            final timeStr =
+                                                "${minutes.toString().padLeft(2, '0')}:${seconds.toStringAsFixed(2).padLeft(5, '0')}";
+                                            buffer.writeln(
+                                              "[$timeStr]${line.text}",
+                                            );
+                                          }
+                                          textController.text =
+                                              buffer.toString();
+                                          if (context.mounted) {
+                                            DefaultTabController.of(context)
+                                                .animateTo(1);
+                                          }
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text('获取失败: $e'),
+                                              ),
+                                            );
+                                          }
+                                        } finally {
+                                          setDialogState(
+                                            () => isLoading = false,
+                                          );
+                                        }
+                                      },
+                                      icon:
+                                          const Icon(Icons.download, size: 16),
+                                      label: const Text('获取歌词'),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          // 模式2：手动输入
+                          Column(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: textController,
+                                  maxLines: null,
+                                  expands: true,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontFamily: 'monospace',
+                                  ),
+                                  decoration: InputDecoration(
+                                    hintText:
+                                        '请在此粘贴 LRC 格式歌词...\n[00:00.00] 歌词内容',
+                                    filled: true,
+                                    fillColor: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.06),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    contentPadding: const EdgeInsets.all(12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  '取消',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final lyrics = textController.text.trim();
+                  if (lyrics.isEmpty) return;
+                  Navigator.of(ctx).pop();
+                  try {
+                    await ref
+                        .read(libraryProvider.notifier)
+                        .saveAllMetadataAndUpdate(
+                          song: song,
+                          lyricsText: lyrics,
+                        );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('歌词已成功导入并内嵌')),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('保存失败: $e')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('保存并内嵌'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

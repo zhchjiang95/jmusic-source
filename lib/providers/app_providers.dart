@@ -330,6 +330,23 @@ class PlayerNotifier extends Notifier<PlayerState> {
     final nextIndex = (state.playMode.index + 1) % modes.length;
     state = state.copyWith(playMode: modes[nextIndex]);
   }
+
+  /// 更新当前播放歌曲的元数据和歌词（主要用于导入歌词后的实时同步）
+  void updateCurrentSongLyrics({required Song song, String? lyricsText}) {
+    if (state.currentSong?.filePath != song.filePath) return;
+
+    Lyrics? lyrics;
+    if (lyricsText != null && lyricsText.isNotEmpty) {
+      lyrics = rust_metadata.parseLrcText(lrcText: lyricsText);
+    }
+
+    state = state.copyWith(
+      currentSong: song,
+      lyrics: lyrics,
+      lrcText: lyricsText,
+      clearLyrics: lyrics == null,
+    );
+  }
 }
 
 /// 播放器全局 Provider
@@ -459,6 +476,16 @@ class LibraryNotifier extends Notifier<LibraryState> {
 
     // 同步到播放列表
     ref.read(playerProvider.notifier).setPlaylist(updatedSongs);
+
+    // 如果当前正在播放这首歌，同步更新播放器状态
+    final playerNotifier = ref.read(playerProvider.notifier);
+    final playerState = ref.read(playerProvider);
+    if (playerState.currentSong?.filePath == song.filePath) {
+      playerNotifier.updateCurrentSongLyrics(
+        song: song,
+        lyricsText: lyricsText,
+      );
+    }
   }
 }
 
