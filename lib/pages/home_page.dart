@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'dart:math';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -625,12 +627,29 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
+        PopupMenuItem(
+          value: 'edit_cover',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(
+                Icons.image_outlined,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              const Text('修改专辑图', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
       ],
     ).then((value) {
       if (value == 'edit') {
         _showEditDialog(context, ref, song);
       } else if (value == 'import_lyrics') {
         _showImportLyricsDialog(context, ref, song);
+      } else if (value == 'edit_cover') {
+        _showEditCoverDialog(context, ref, song);
       }
     });
   }
@@ -949,6 +968,185 @@ class _HomePageState extends ConsumerState<HomePage> {
                   }
                 },
                 child: const Text('保存并内嵌'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// 修改专辑图对话框
+  void _showEditCoverDialog(BuildContext context, WidgetRef ref, Song song) {
+    final theme = Theme.of(context);
+    final urlController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E1E2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.image_outlined,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '修改专辑图 - ${song.title}',
+                    style: TextStyle(
+                      color: theme.colorScheme.onSurface,
+                      fontSize: 15,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '输入图片网络地址：',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: urlController,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'http://...',
+                      filled: true,
+                      fillColor: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      '或',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: isLoading ? null : () async {
+                        final result = await FilePicker.platform.pickFiles(
+                          type: FileType.image,
+                        );
+                        if (result != null && result.files.single.path != null) {
+                          setDialogState(() => isLoading = true);
+                          try {
+                            final file = File(result.files.single.path!);
+                            final bytes = await file.readAsBytes();
+                            Navigator.of(ctx).pop();
+                            await ref
+                                .read(libraryProvider.notifier)
+                                .saveAllMetadataAndUpdate(
+                                  song: song,
+                                  coverData: bytes,
+                                );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('专辑图已成功更新')),
+                              );
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('保存失败: $e')),
+                              );
+                            }
+                          } finally {
+                            if (context.mounted) {
+                              setDialogState(() => isLoading = false);
+                            }
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.folder_open, size: 16),
+                      label: const Text('选择本地图片'),
+                    ),
+                  ),
+                  if (isLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(
+                  '取消',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              FilledButton(
+                onPressed: isLoading ? null : () async {
+                  final url = urlController.text.trim();
+                  if (url.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('请输入图片地址或选择本地图片')),
+                    );
+                    return;
+                  }
+                  setDialogState(() => isLoading = true);
+                  try {
+                    final response = await http.get(Uri.parse(url));
+                    if (response.statusCode == 200) {
+                      final bytes = response.bodyBytes;
+                      Navigator.of(ctx).pop();
+                      await ref
+                          .read(libraryProvider.notifier)
+                          .saveAllMetadataAndUpdate(
+                            song: song,
+                            coverData: bytes,
+                          );
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('专辑图已成功更新')),
+                        );
+                      }
+                    } else {
+                      throw Exception('下载失败，状态码: ${response.statusCode}');
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('下载或保存失败: $e')),
+                      );
+                    }
+                    setDialogState(() => isLoading = false);
+                  }
+                },
+                child: const Text('保存网络图片'),
               ),
             ],
           );
