@@ -86,6 +86,7 @@ class PlayerState {
 /// 播放器状态管理（Riverpod 3.x Notifier）
 class PlayerNotifier extends Notifier<PlayerState> {
   Timer? _positionTimer;
+  bool _isSeeking = false;
 
   @override
   PlayerState build() {
@@ -114,6 +115,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
   void _startPositionTimer() {
     _positionTimer?.cancel();
     _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      // seek 期间跳过更新，防止覆盖用户设置的新位置
+      if (_isSeeking) return;
       if (state.isPlaying && state.currentSong != null) {
         final newPos = state.position + const Duration(milliseconds: 500);
         if (newPos >= state.duration) {
@@ -314,8 +317,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 跳转到指定位置
   void seekTo(Duration position) {
-    rust_player.playerSeek(positionSecs: position.inMilliseconds / 1000.0);
+    _isSeeking = true;
     state = state.copyWith(position: position);
+    try {
+      rust_player.playerSeek(positionSecs: position.inMilliseconds / 1000.0);
+    } catch (_) {
+      // seek 失败（部分格式不支持），忽略错误
+    }
+    // 延迟解除标志，确保定时器至少跳过一个周期
+    Future.delayed(const Duration(milliseconds: 600), () {
+      _isSeeking = false;
+    });
   }
 
   /// 设置音量

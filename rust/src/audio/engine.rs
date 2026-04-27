@@ -1,8 +1,8 @@
-use rodio::{Decoder, OutputStream, Sink};
-use std::fs::File;
-use std::io::BufReader;
+use rodio::{OutputStream, Sink};
 use std::sync::mpsc;
 use std::thread;
+
+use super::source::SeekableSource;
 
 /// 音频引擎命令
 enum AudioCommand {
@@ -49,6 +49,7 @@ impl AudioEngine {
             };
 
             let mut sink: Option<Sink> = None;
+            let mut current_file: Option<String> = None;
             let _stream = stream; // 保持存活
 
             // 处理命令循环
@@ -56,11 +57,7 @@ impl AudioEngine {
                 match cmd {
                     AudioCommand::Play(file_path, reply) => {
                         let result = (|| -> Result<(), String> {
-                            let file = File::open(&file_path)
-                                .map_err(|e| format!("无法打开文件 {}: {}", file_path, e))?;
-                            let reader = BufReader::new(file);
-                            let source = Decoder::new(reader)
-                                .map_err(|e| format!("无法解码文件 {}: {}", file_path, e))?;
+                            let source = SeekableSource::new(&file_path)?;
 
                             // 停止当前播放
                             if let Some(s) = sink.take() {
@@ -71,6 +68,7 @@ impl AudioEngine {
                             let new_sink = Sink::try_new(&stream_handle)
                                 .map_err(|e| format!("无法创建 Sink: {}", e))?;
                             new_sink.append(source);
+                            current_file = Some(file_path);
                             sink = Some(new_sink);
                             Ok(())
                         })();
@@ -90,6 +88,7 @@ impl AudioEngine {
                         if let Some(s) = sink.take() {
                             s.stop();
                         }
+                        current_file = None;
                     }
                     AudioCommand::SetVolume(vol) => {
                         if let Some(s) = &sink {
@@ -101,12 +100,36 @@ impl AudioEngine {
                         let _ = reply.send(vol);
                     }
                     AudioCommand::Seek(pos, reply) => {
-                        let result = if let Some(s) = &sink {
-                            s.try_seek(std::time::Duration::from_secs_f64(pos))
-                                .map_err(|e| format!("跳转失败: {}", e))
-                        } else {
-                            Err("未在播放".to_string())
-                        };
+                        let result = (|| -> Result<(), String> {
+                            let file_path = current_file.as_ref()
+                                .ok_or("未在播放".to_string())?
+                                .clone();
+                            let volume = sink.as_ref().map(|s| s.volume()).unwrap_or(1.0);
+                            let was_paused = sink.as_ref()
+                                .map(|s| s.is_paused()).unwrap_or(false);
+
+                            // 停止当前播放
+                            if let Some(s) = sink.take() {
+                                s.stop();
+                            }
+
+                            // 重新打开文件，用 symphonia 直接 seek（容器级高效跳转）
+                            let mut source = SeekableSource::new(&file_path)?;
+                            source.seek(pos)?;
+
+                            // 创建新 Sink 从 seek 位置播放
+                            let new_sink = Sink::try_new(&stream_handle)
+                                .map_err(|e| format!("无法创建 Sink: {}", e))?;
+                            new_sink.set_volume(volume);
+                            new_sink.append(source);
+
+                            if was_paused {
+                                new_sink.pause();
+                            }
+
+                            sink = Some(new_sink);
+                            Ok(())
+                        })();
                         let _ = reply.send(result);
                     }
                     AudioCommand::IsFinished(reply) => {
