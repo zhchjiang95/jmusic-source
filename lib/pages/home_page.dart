@@ -104,32 +104,32 @@ class _HomePageState extends ConsumerState<HomePage> {
                 padding: const EdgeInsets.fromLTRB(24, 12, 16, 4),
                 child: Row(
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            theme.colorScheme.primary,
-                            theme.colorScheme.tertiary,
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.music_note,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'JMusic',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
+                    // Container(
+                    //   width: 36,
+                    //   height: 36,
+                    //   decoration: BoxDecoration(
+                    //     gradient: LinearGradient(
+                    //       colors: [
+                    //         theme.colorScheme.primary,
+                    //         theme.colorScheme.tertiary,
+                    //       ],
+                    //     ),
+                    //     borderRadius: BorderRadius.circular(10),
+                    //   ),
+                    //   child: const Icon(
+                    //     Icons.music_note,
+                    //     color: Colors.white,
+                    //     size: 20,
+                    //   ),
+                    // ),
+                    // const SizedBox(width: 10),
+                    // Text(
+                    //   'JMusic',
+                    //   style: theme.textTheme.titleLarge?.copyWith(
+                    //     fontWeight: FontWeight.bold,
+                    //     color: theme.colorScheme.onSurface,
+                    //   ),
+                    // ),
                     const Spacer(),
                     if (libraryState.songs.isNotEmpty)
                       Text(
@@ -452,9 +452,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                             ref
                                 .read(playerProvider.notifier)
                                 .setPlaylist(songs);
-                            ref
-                                .read(playerProvider.notifier)
-                                .playSongAt(index);
+                            ref.read(playerProvider.notifier).playSongAt(index);
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -779,15 +777,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                   children: [
                     TabBar(
                       labelColor: theme.colorScheme.primary,
-                      unselectedLabelColor:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      unselectedLabelColor: theme.colorScheme.onSurface
+                          .withValues(alpha: 0.5),
                       indicatorColor: theme.colorScheme.primary,
                       dividerColor: Colors.transparent,
                       labelStyle: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
                       ),
-                      tabs: const [Tab(text: '网易云在线'), Tab(text: '手动输入')],
+                      tabs: const [
+                        Tab(text: '网易云在线'),
+                        Tab(text: '手动输入'),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     SizedBox(
@@ -868,16 +869,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                                               "[$timeStr]${line.text}",
                                             );
                                           }
-                                          textController.text =
-                                              buffer.toString();
+                                          textController.text = buffer
+                                              .toString();
                                           if (context.mounted) {
-                                            DefaultTabController.of(context)
-                                                .animateTo(1);
+                                            DefaultTabController.of(
+                                              context,
+                                            ).animateTo(1);
                                           }
                                         } catch (e) {
                                           if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
                                               SnackBar(
                                                 content: Text('获取失败: $e'),
                                               ),
@@ -889,8 +892,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                                           );
                                         }
                                       },
-                                      icon:
-                                          const Icon(Icons.download, size: 16),
+                                      icon: const Icon(
+                                        Icons.download,
+                                        size: 16,
+                                      ),
                                       label: const Text('获取歌词'),
                                     ),
                                   ),
@@ -961,9 +966,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                     }
                   } catch (e) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('保存失败: $e')),
-                      );
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
                     }
                   }
                 },
@@ -1031,7 +1036,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                     decoration: InputDecoration(
                       hintText: 'http://...',
                       filled: true,
-                      fillColor: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+                      fillColor: theme.colorScheme.onSurface.withValues(
+                        alpha: 0.06,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
@@ -1044,7 +1051,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                       '或',
                       style: TextStyle(
                         fontSize: 12,
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.4,
+                        ),
                       ),
                     ),
                   ),
@@ -1052,40 +1061,42 @@ class _HomePageState extends ConsumerState<HomePage> {
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: isLoading ? null : () async {
-                        final result = await FilePicker.platform.pickFiles(
-                          type: FileType.image,
-                        );
-                        if (result != null && result.files.single.path != null) {
-                          setDialogState(() => isLoading = true);
-                          try {
-                            final file = File(result.files.single.path!);
-                            final bytes = await file.readAsBytes();
-                            Navigator.of(ctx).pop();
-                            await ref
-                                .read(libraryProvider.notifier)
-                                .saveAllMetadataAndUpdate(
-                                  song: song,
-                                  coverData: bytes,
-                                );
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('专辑图已成功更新')),
-                              );
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('保存失败: $e')),
-                              );
-                            }
-                          } finally {
-                            if (context.mounted) {
-                              setDialogState(() => isLoading = false);
-                            }
-                          }
-                        }
-                      },
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              final result = await FilePicker.platform
+                                  .pickFiles(type: FileType.image);
+                              if (result != null &&
+                                  result.files.single.path != null) {
+                                setDialogState(() => isLoading = true);
+                                try {
+                                  final file = File(result.files.single.path!);
+                                  final bytes = await file.readAsBytes();
+                                  Navigator.of(ctx).pop();
+                                  await ref
+                                      .read(libraryProvider.notifier)
+                                      .saveAllMetadataAndUpdate(
+                                        song: song,
+                                        coverData: bytes,
+                                      );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('专辑图已成功更新')),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('保存失败: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (context.mounted) {
+                                    setDialogState(() => isLoading = false);
+                                  }
+                                }
+                              }
+                            },
                       icon: const Icon(Icons.folder_open, size: 16),
                       label: const Text('选择本地图片'),
                     ),
@@ -1109,43 +1120,45 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
               FilledButton(
-                onPressed: isLoading ? null : () async {
-                  final url = urlController.text.trim();
-                  if (url.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('请输入图片地址或选择本地图片')),
-                    );
-                    return;
-                  }
-                  setDialogState(() => isLoading = true);
-                  try {
-                    final response = await http.get(Uri.parse(url));
-                    if (response.statusCode == 200) {
-                      final bytes = response.bodyBytes;
-                      Navigator.of(ctx).pop();
-                      await ref
-                          .read(libraryProvider.notifier)
-                          .saveAllMetadataAndUpdate(
-                            song: song,
-                            coverData: bytes,
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        final url = urlController.text.trim();
+                        if (url.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('请输入图片地址或选择本地图片')),
                           );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('专辑图已成功更新')),
-                        );
-                      }
-                    } else {
-                      throw Exception('下载失败，状态码: ${response.statusCode}');
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('下载或保存失败: $e')),
-                      );
-                    }
-                    setDialogState(() => isLoading = false);
-                  }
-                },
+                          return;
+                        }
+                        setDialogState(() => isLoading = true);
+                        try {
+                          final response = await http.get(Uri.parse(url));
+                          if (response.statusCode == 200) {
+                            final bytes = response.bodyBytes;
+                            Navigator.of(ctx).pop();
+                            await ref
+                                .read(libraryProvider.notifier)
+                                .saveAllMetadataAndUpdate(
+                                  song: song,
+                                  coverData: bytes,
+                                );
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('专辑图已成功更新')),
+                              );
+                            }
+                          } else {
+                            throw Exception('下载失败，状态码: ${response.statusCode}');
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('下载或保存失败: $e')),
+                            );
+                          }
+                          setDialogState(() => isLoading = false);
+                        }
+                      },
                 child: const Text('保存网络图片'),
               ),
             ],
