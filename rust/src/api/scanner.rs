@@ -125,6 +125,24 @@ pub fn scan_and_update_library(dir_path: String) -> Result<Library, String> {
     // 扫描新目录
     let new_songs = scan_music_directory(dir_path.clone())?;
 
+    // 收集本次扫描到的所有文件路径
+    let scanned_paths: std::collections::HashSet<String> =
+        new_songs.iter().map(|s| s.file_path.clone()).collect();
+
+    let dir_path_obj = std::path::Path::new(&dir_path);
+
+    // 清理已被删除的文件
+    // 如果一首歌在 dir_path 下，但这次扫描没找到，说明它被删除了
+    library.songs.retain(|song| {
+        let song_path = std::path::Path::new(&song.file_path);
+        if song_path.starts_with(dir_path_obj) {
+            scanned_paths.contains(&song.file_path)
+        } else {
+            // 不在当前扫描目录下的歌，保持原样
+            true
+        }
+    });
+
     // 合并：以文件路径为唯一标识
     let existing_paths: std::collections::HashSet<String> =
         library.songs.iter().map(|s| s.file_path.clone()).collect();
