@@ -15,8 +15,9 @@ class LyricsView extends ConsumerStatefulWidget {
 
 class _LyricsViewState extends ConsumerState<LyricsView> {
   final ScrollController _scrollController = ScrollController();
-  static const double _itemHeight = 48.0;
+  List<GlobalKey> _keys = [];
   int _lastLineIndex = -1;
+  Object? _lastLyrics;
 
   @override
   void dispose() {
@@ -25,32 +26,18 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
   }
 
   /// 滚动到指定歌词行
-  void _scrollToLine(int index, int totalLines) {
-    if (!_scrollController.hasClients || index < 0) return;
-
-    // ListView 有 padding，内容区从 padding.top 开始
-    // maxScrollExtent 已包含 padding 的影响
-    // index * _itemHeight 是该行相对于内容区顶部的偏移
-    // 加上顶部 padding 后再减半个视口使其居中
-    final topPadding = _scrollController.position.maxScrollExtent > 0
-        ? (_scrollController.position.maxScrollExtent -
-                  (totalLines * _itemHeight -
-                      _scrollController.position.viewportDimension)) /
-              2
-        : 0.0;
-    final viewportHeight = _scrollController.position.viewportDimension;
-    final targetOffset =
-        (topPadding +
-                index * _itemHeight -
-                viewportHeight / 2 +
-                _itemHeight / 2)
-            .clamp(0.0, _scrollController.position.maxScrollExtent);
-
-    _scrollController.animateTo(
-      targetOffset,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeOutCubic,
-    );
+  void _scrollToLine(int index) {
+    if (!_scrollController.hasClients || index < 0 || index >= _keys.length) return;
+    
+    final key = _keys[index];
+    if (key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+        alignment: 0.5,
+      );
+    }
   }
 
   @override
@@ -60,6 +47,17 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
       playerProvider.select((s) => s.position.inMilliseconds),
     );
     final theme = Theme.of(context);
+
+    // 当歌词对象发生变化时（例如切换歌曲），重置状态并滚动到顶部
+    if (lyrics != _lastLyrics) {
+      _lastLyrics = lyrics;
+      _lastLineIndex = -1;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(0);
+        }
+      });
+    }
 
     if (lyrics == null || lyrics.lines.isEmpty) {
       return Center(
@@ -82,11 +80,16 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
       }
     }
 
+    // 确保有足够的 GlobalKey
+    if (_keys.length != lyrics.lines.length) {
+      _keys = List.generate(lyrics.lines.length, (_) => GlobalKey());
+    }
+
     // 当歌词行变化时自动滚动
     if (currentLineIndex != _lastLineIndex && currentLineIndex >= 0) {
       _lastLineIndex = currentLineIndex;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToLine(currentLineIndex, lyrics.lines.length);
+        _scrollToLine(currentLineIndex);
       });
     }
 
@@ -125,45 +128,46 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
               builder: (context, constraints) {
                 // 全屏模式时，上下留半个视口高度，使首尾行也能居中
                 final verticalPad = widget.isFullScreen
-                    ? constraints.maxHeight / 2 - _itemHeight / 2
+                    ? constraints.maxHeight / 2 - 24.0
                     : 8.0;
-                return ListView.builder(
+                return SingleChildScrollView(
                   controller: _scrollController,
                   padding: EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: verticalPad,
                   ),
-                  itemCount: lyrics.lines.length,
-                  itemExtent: _itemHeight,
-                  itemBuilder: (context, index) {
-                    final line = lyrics.lines[index];
-                    final isCurrentLine = index == currentLineIndex;
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: List.generate(lyrics.lines.length, (index) {
+                      final line = lyrics.lines[index];
+                      final isCurrentLine = index == currentLineIndex;
 
-                    return AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 300),
-                      style: TextStyle(
-                        fontSize: isCurrentLine
-                            ? (widget.isFullScreen ? 20 : 18)
-                            : (widget.isFullScreen ? 16 : 15),
-                        fontWeight: isCurrentLine
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: isCurrentLine
-                            ? theme.colorScheme.primary
-                            : Colors.white.withValues(alpha: 0.35),
-                        height: 1.5,
-                      ),
-                      child: Align(
+                      return Container(
+                        key: _keys[index],
+                        padding: const EdgeInsets.symmetric(vertical: 12.0),
                         alignment: Alignment.centerLeft,
-                        child: Text(
-                          line.text,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
+                        child: AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 300),
+                          style: TextStyle(
+                            fontSize: isCurrentLine
+                                ? (widget.isFullScreen ? 20 : 18)
+                                : (widget.isFullScreen ? 16 : 15),
+                            fontWeight: isCurrentLine
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: isCurrentLine
+                                ? theme.colorScheme.primary
+                                : Colors.white.withValues(alpha: 0.35),
+                            height: 1.5,
+                          ),
+                          child: Text(
+                            line.text,
+                            textAlign: TextAlign.left,
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    }),
+                  ),
                 );
               },
             ),
