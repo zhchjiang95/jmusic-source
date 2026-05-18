@@ -66,6 +66,13 @@ lib/
 - Flutter SDK ≥ 3.11
 - Rust toolchain（`rustup`）
 - macOS: Xcode + CocoaPods
+- Android:
+  - **Android SDK** 和 **JDK 17** (通常通过安装 Android Studio 自动配置)
+  - **Android NDK** (需要在 Android Studio 的 SDK Manager -> SDK Tools 中勾选 `NDK (Side by side)` 进行安装)
+  - **Rust Android 跨平台编译目标**:
+    ```bash
+    rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+    ```
 
 ### 运行
 
@@ -80,6 +87,7 @@ flutter run -d macos
 # 其他平台
 flutter run -d windows
 flutter run -d linux
+flutter run -d <android-device-id> # 运行到安卓设备或模拟器
 ```
 
 ### 构建
@@ -88,6 +96,8 @@ flutter run -d linux
 flutter build macos
 flutter build windows
 flutter build linux
+flutter build apk         # 构建 Android APK 包
+flutter build appbundle   # 构建 Google Play 的 AAB 格式包
 ```
 
 ### 🖼️ 更新应用图标
