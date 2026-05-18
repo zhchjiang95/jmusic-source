@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/src/rust/api/player.dart' as rust_player;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
@@ -92,6 +94,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
   PlayerState build() {
     // 初始化时启动音频引擎
     _initEngine();
+    // 初始化时设置默认的原生窗口和托盘提示
+    NativeUtils.updateTitle('JMusic');
     // 清理定时器
     ref.onDispose(() {
       _positionTimer?.cancel();
@@ -174,6 +178,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
         isLoading: false,
       );
 
+      // 播放歌曲时更新原生托盘及窗口标题
+      NativeUtils.updateTitle('${song.title} - ${song.artist}');
+
       _startPositionTimer();
       _fetchOnlineInfo(song);
     } catch (e) {
@@ -244,6 +251,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
             modifiedAt: oldSong.modifiedAt,
           );
           state = state.copyWith(currentSong: updatedSong);
+          // 在线更新了歌曲或歌手信息后，同步刷新原生托盘和窗口标题
+          NativeUtils.updateTitle('${updatedSong.title} - ${updatedSong.artist}');
         }
 
         // 歌词（嵌入数据没有时才在线获取）
@@ -358,6 +367,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
       lrcText: lyricsText,
       clearLyrics: lyrics == null,
     );
+
+    // 同步更新原生窗口和托盘标题
+    NativeUtils.updateTitle('${song.title} - ${song.artist}');
   }
 }
 
@@ -505,3 +517,18 @@ class LibraryNotifier extends Notifier<LibraryState> {
 final libraryProvider = NotifierProvider<LibraryNotifier, LibraryState>(
   LibraryNotifier.new,
 );
+
+/// 原生系统通信工具类，用于更新系统窗口和托盘的显示状态
+class NativeUtils {
+  static const _channel = MethodChannel('com.jmusic.app/tray');
+
+  /// 更新原生窗口和系统托盘标题提示（仅在 Windows 平台执行）
+  static Future<void> updateTitle(String title) async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod('updateTitle', title);
+    } catch (e) {
+      print('更新原生托盘和任务栏标题失败: $e');
+    }
+  }
+}

@@ -1,8 +1,12 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <shellapi.h>
+
+#include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
+#include "resource.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -25,6 +29,53 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+
+  // 注册并初始化用于与 Dart 通信的 MethodChannel
+  method_channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+      flutter_controller_->engine()->messenger(),
+      "com.jmusic.app/tray",
+      &flutter::StandardMethodCodec::GetInstance());
+
+  method_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+        if (call.method_name().compare("updateTitle") == 0) {
+          const auto* arguments = std::get_if<std::string>(call.arguments());
+          if (arguments) {
+            std::string title = *arguments;
+            // 将 UTF-8 std::string 转换为 std::wstring 供 Windows API 使用
+            int len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, nullptr, 0);
+            if (len > 0) {
+              std::wstring wtitle(len, 0);
+              MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, &wtitle[0], len);
+              if (!wtitle.empty() && wtitle.back() == 0) {
+                wtitle.pop_back();
+              }
+
+              HWND hwnd = GetHandle();
+              if (hwnd) {
+                // 1. 修改窗口标题（用于任务栏最小化时的显示）
+                SetWindowTextW(hwnd, wtitle.c_str());
+
+                // 2. 修改系统托盘的鼠标悬停浮动提示（Title）
+                NOTIFYICONDATAW nid = {};
+                nid.cbSize = sizeof(NOTIFYICONDATAW);
+                nid.hWnd = hwnd;
+                nid.uID = 1;
+                nid.uFlags = NIF_TIP;
+                wcsncpy_s(nid.szTip, wtitle.c_str(), _countof(nid.szTip));
+                Shell_NotifyIconW(NIM_MODIFY, &nid);
+              }
+            }
+            result->Success();
+          } else {
+            result->Error("BAD_ARGS", "Expected string argument");
+          }
+        } else {
+          result->NotImplemented();
+        }
+      });
+
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -36,10 +87,16 @@ bool FlutterWindow::OnCreate() {
   // window is shown. It is a no-op if the first frame hasn't completed yet.
   flutter_controller_->ForceRedraw();
 
+  // 初始化并添加系统托盘图标
+  AddTrayIcon(GetHandle());
+
   return true;
 }
 
 void FlutterWindow::OnDestroy() {
+  // 移除系统托盘图标
+  RemoveTrayIcon(GetHandle());
+
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
@@ -51,6 +108,28 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  switch (message) {
+    case WM_CLOSE:
+      if (!is_exiting_) {
+        // 关闭主窗口时隐藏它，实现“最小化到托盘”的效果
+        ShowWindow(hwnd, SW_HIDE);
+        return 0;
+      }
+      break;
+
+    case WM_TRAY_ICON:
+      if (lparam == WM_LBUTTONUP) {
+        // 左键点击托盘：显示并恢复主窗口
+        ShowWindow(hwnd, SW_SHOW);
+        ShowWindow(hwnd, SW_RESTORE);
+        SetForegroundWindow(hwnd);
+      } else if (lparam == WM_RBUTTONUP) {
+        // 右键点击托盘：弹出上下文菜单
+        ShowTrayPopupMenu(hwnd);
+      }
+      return 0;
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =
@@ -68,4 +147,60 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
+}
+
+// 添加系统托盘图标的实现
+void FlutterWindow::AddTrayIcon(HWND hwnd) {
+  NOTIFYICONDATAW nid = {};
+  nid.cbSize = sizeof(NOTIFYICONDATAW);
+  nid.hWnd = hwnd;
+  nid.uID = 1; // 托盘图标的唯一 ID
+  nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+  nid.uCallbackMessage = WM_TRAY_ICON;
+  nid.hIcon = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_APP_ICON));
+  wcsncpy_s(nid.szTip, L"JMusic", _countof(nid.szTip));
+
+  Shell_NotifyIconW(NIM_ADD, &nid);
+}
+
+// 移除系统托盘图标的实现
+void FlutterWindow::RemoveTrayIcon(HWND hwnd) {
+  NOTIFYICONDATAW nid = {};
+  nid.cbSize = sizeof(NOTIFYICONDATAW);
+  nid.hWnd = hwnd;
+  nid.uID = 1;
+
+  Shell_NotifyIconW(NIM_DELETE, &nid);
+}
+
+// 弹出系统托盘右键菜单的实现
+void FlutterWindow::ShowTrayPopupMenu(HWND hwnd) {
+  HMENU hMenu = CreatePopupMenu();
+  if (hMenu) {
+    // 菜单项：显示主窗口和退出
+    AppendMenuW(hMenu, MF_STRING, 1001, L"显示主窗口");
+    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuW(hMenu, MF_STRING, 1002, L"退出");
+
+    POINT pt;
+    GetCursorPos(&pt);
+
+    // 必须在显示菜单前设置窗口为前台窗口，否则在别处点击时菜单不会自动消失
+    SetForegroundWindow(hwnd);
+
+    int tracking_flags = TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_NONOTIFY;
+    UINT cmd = TrackPopupMenu(hMenu, tracking_flags, pt.x, pt.y, 0, hwnd, nullptr);
+    DestroyMenu(hMenu);
+
+    if (cmd == 1001) {
+      // 显示并恢复窗口
+      ShowWindow(hwnd, SW_SHOW);
+      ShowWindow(hwnd, SW_RESTORE);
+      SetForegroundWindow(hwnd);
+    } else if (cmd == 1002) {
+      // 标记正在退出程序，并销毁窗口
+      is_exiting_ = true;
+      DestroyWindow(hwnd);
+    }
+  }
 }
