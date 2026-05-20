@@ -20,7 +20,7 @@ lofty = "0.22"
 tokio = { version = "1", features = ["full"] }
 
 # 网络请求（QQ 音乐接口）
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # 序列化/反序列化
 serde = { version = "1", features = ["derive"] }
