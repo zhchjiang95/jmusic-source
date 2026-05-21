@@ -6,9 +6,5 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-/// 清除所有缓存（歌词 + 封面）
-Future<void> clearAllCache() =>
-    RustLib.instance.api.crateApiCacheClearAllCache();
-
 /// 重置歌曲库（清空所有数据）
 Future<void> resetLibrary() => RustLib.instance.api.crateApiCacheResetLibrary();

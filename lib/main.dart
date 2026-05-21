@@ -5,7 +5,17 @@ import 'package:jmusic/src/rust/frb_generated.dart';
 import 'package:jmusic/pages/home_page.dart';
 
 Future<void> main() async {
-  await RustLib.init();
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await RustLib.init();
+  } catch (e) {
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(child: Text('Rust 初始化失败: $e')),
+      ),
+    ));
+    return;
+  }
   runApp(const ProviderScope(child: JMusicApp()));
 }
 

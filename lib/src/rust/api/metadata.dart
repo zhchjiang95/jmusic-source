@@ -12,7 +12,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<List<QQMusicSearchResult>> searchSongOnline({required String keyword}) =>
     RustLib.instance.api.crateApiMetadataSearchSongOnline(keyword: keyword);
 
-/// 获取歌词（优先从缓存读取，无缓存则在线获取）
+/// 获取歌词（在线获取）
 Future<Lyrics> getLyrics({required String songmid}) =>
     RustLib.instance.api.crateApiMetadataGetLyrics(songmid: songmid);
 
@@ -20,13 +20,9 @@ Future<Lyrics> getLyrics({required String songmid}) =>
 Future<Lyrics> getNeteaseLyrics({required String id}) =>
     RustLib.instance.api.crateApiMetadataGetNeteaseLyrics(id: id);
 
-/// 获取专辑封面（优先从缓存读取，无缓存则在线下载）
+/// 获取专辑封面（在线下载）
 Future<Uint8List> getCover({required String albummid}) =>
     RustLib.instance.api.crateApiMetadataGetCover(albummid: albummid);
-
-/// 获取缓存的封面文件路径
-String? getCoverCachePath({required String albummid}) =>
-    RustLib.instance.api.crateApiMetadataGetCoverCachePath(albummid: albummid);
 
 /// 获取封面 URL（不下载）
 String getCoverUrl({required String albummid}) =>

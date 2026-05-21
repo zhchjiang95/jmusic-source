@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/src/rust/api/player.dart' as rust_player;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
+import 'package:jmusic/src/rust/api/play_stats.dart' as rust_play_stats;
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
 
@@ -176,6 +177,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
         position: Duration.zero,
         duration: Duration(seconds: song.duration.toInt()),
         isLoading: false,
+      );
+
+      // 记录播放次数
+      rust_play_stats.recordPlay(
+        filePath: song.filePath,
+        title: song.title,
+        artist: song.artist,
       );
 
       // 播放歌曲时更新原生托盘及窗口标题

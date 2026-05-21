@@ -5,6 +5,7 @@
 
 import 'api/cache.dart';
 import 'api/metadata.dart';
+import 'api/play_stats.dart';
 import 'api/player.dart';
 import 'api/scanner.dart';
 import 'api/simple.dart';
@@ -46,6 +47,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LyricLine> dco_decode_list_lyric_line(dynamic raw);
 
   @protected
+  List<PlayCountEntry> dco_decode_list_play_count_entry(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
@@ -70,6 +74,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  PlayCountEntry dco_decode_play_count_entry(dynamic raw);
+
+  @protected
   QQMusicSearchResult dco_decode_qq_music_search_result(dynamic raw);
 
   @protected
@@ -77,6 +84,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Song dco_decode_song(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   BigInt dco_decode_u_64(dynamic raw);
@@ -109,6 +119,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LyricLine> sse_decode_list_lyric_line(SseDeserializer deserializer);
 
   @protected
+  List<PlayCountEntry> sse_decode_list_play_count_entry(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
@@ -135,6 +150,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  PlayCountEntry sse_decode_play_count_entry(SseDeserializer deserializer);
+
+  @protected
   QQMusicSearchResult sse_decode_qq_music_search_result(
     SseDeserializer deserializer,
   );
@@ -144,6 +162,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Song sse_decode_song(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
 
   @protected
   BigInt sse_decode_u_64(SseDeserializer deserializer);
@@ -182,6 +203,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_play_count_entry(
+    List<PlayCountEntry> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -215,6 +242,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_play_count_entry(
+    PlayCountEntry self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_qq_music_search_result(
     QQMusicSearchResult self,
     SseSerializer serializer,
@@ -225,6 +258,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_song(Song self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_64(BigInt self, SseSerializer serializer);

@@ -9,6 +9,7 @@ import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
 import 'package:jmusic/widgets/mini_player.dart';
+import 'package:jmusic/pages/play_stats_page.dart';
 
 /// 主页 - 歌曲库列表
 class HomePage extends ConsumerStatefulWidget {
@@ -141,57 +142,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                       ),
                     const SizedBox(width: 8),
-                    if (playerState.currentSong != null)
-                      IconButton(
-                        onPressed: () {
-                          final currentSong = playerState.currentSong;
-                          if (currentSong == null) return;
-
-                          void scrollToTarget(int index) {
-                            if (!_scrollController.hasClients) return;
-                            final targetOffset = index * 44.0;
-                            final viewportHeight =
-                                _scrollController.position.viewportDimension;
-                            final maxScroll =
-                                _scrollController.position.maxScrollExtent;
-                            var offset =
-                                targetOffset - viewportHeight / 2 + 22.0;
-                            if (offset < 0) offset = 0;
-                            if (offset > maxScroll) offset = maxScroll;
-
-                            _scrollController.animateTo(
-                              offset,
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            );
-                          }
-
-                          final index = filteredSongs.indexWhere(
-                            (s) => s.filePath == currentSong.filePath,
-                          );
-                          if (index != -1) {
-                            scrollToTarget(index);
-                          } else {
-                            _searchController.clear();
-                            setState(() => _searchQuery = '');
-                            Future.delayed(
-                              const Duration(milliseconds: 100),
-                              () {
-                                final realIndex = libraryState.songs.indexWhere(
-                                  (s) => s.filePath == currentSong.filePath,
-                                );
-                                if (realIndex != -1) scrollToTarget(realIndex);
-                              },
-                            );
-                          }
-                        },
-                        icon: Icon(
-                          Icons.location_on,
-                          color: theme.colorScheme.primary,
-                          size: 20,
-                        ),
-                        tooltip: '定位当前播放',
-                      ),
                     IconButton(
                       onPressed: libraryState.isScanning
                           ? null
@@ -211,6 +161,21 @@ class _HomePageState extends ConsumerState<HomePage> {
                               size: 22,
                             ),
                       tooltip: '添加音乐目录',
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PlayStatsPage(),
+                          ),
+                        );
+                      },
+                      icon: Icon(
+                        Icons.bar_chart,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                      tooltip: '播放统计',
                     ),
                   ],
                 ),
@@ -283,20 +248,111 @@ class _HomePageState extends ConsumerState<HomePage> {
 
               // 歌曲列表
               Expanded(
-                child: libraryState.songs.isEmpty
-                    ? _buildEmptyState(context, ref, libraryState)
-                    : _buildSongList(
-                        context,
-                        ref,
-                        filteredSongs,
-                        libraryState,
-                        playerState,
+                child: Stack(
+                  children: [
+                    libraryState.songs.isEmpty
+                        ? _buildEmptyState(context, ref, libraryState)
+                        : _buildSongList(
+                            context,
+                            ref,
+                            filteredSongs,
+                            libraryState,
+                            playerState,
+                          ),
+                    // 悬浮定位按钮（右下角）
+                    if (playerState.currentSong != null)
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: _buildLocateButton(
+                          context,
+                          filteredSongs,
+                          libraryState,
+                          playerState,
+                        ),
                       ),
+                  ],
+                ),
               ),
 
               // 底部迷你播放栏
               if (playerState.currentSong != null) const MiniPlayer(),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 悬浮定位按钮（中心实心圆 + 外圆环）
+  Widget _buildLocateButton(
+    BuildContext context,
+    List<Song> filteredSongs,
+    LibraryState libraryState,
+    PlayerState playerState,
+  ) {
+    final theme = Theme.of(context);
+    final primaryColor = theme.colorScheme.primary;
+
+    return GestureDetector(
+      onTap: () {
+        final currentSong = playerState.currentSong;
+        if (currentSong == null) return;
+
+        void scrollToTarget(int index) {
+          if (!_scrollController.hasClients) return;
+          final targetOffset = index * 44.0;
+          final viewportHeight =
+              _scrollController.position.viewportDimension;
+          final maxScroll = _scrollController.position.maxScrollExtent;
+          var offset = targetOffset - viewportHeight / 2 + 22.0;
+          if (offset < 0) offset = 0;
+          if (offset > maxScroll) offset = maxScroll;
+
+          _scrollController.animateTo(
+            offset,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+
+        final index = filteredSongs.indexWhere(
+          (s) => s.filePath == currentSong.filePath,
+        );
+        if (index != -1) {
+          scrollToTarget(index);
+        } else {
+          _searchController.clear();
+          setState(() => _searchQuery = '');
+          Future.delayed(
+            const Duration(milliseconds: 100),
+            () {
+              final realIndex = libraryState.songs.indexWhere(
+                (s) => s.filePath == currentSong.filePath,
+              );
+              if (realIndex != -1) scrollToTarget(realIndex);
+            },
+          );
+        }
+      },
+      child: Tooltip(
+        message: '定位当前播放',
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: theme.colorScheme.surface,
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withValues(alpha: 0.2),
+                blurRadius: 8,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: CustomPaint(
+            painter: _LocateIconPainter(color: primaryColor),
           ),
         ),
       ),
@@ -1219,5 +1275,52 @@ class _HomePageState extends ConsumerState<HomePage> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+/// 定位图标绘制器：中心实心圆 + 外圆环（虚线效果）
+class _LocateIconPainter extends CustomPainter {
+  final Color color;
+
+  _LocateIconPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+
+    // 外圆环（虚线段效果）
+    final outerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+
+    const outerRadius = 13.0;
+    const segments = 8;
+    const gapAngle = 0.3; // 间隔弧度
+    const segmentAngle = (2 * 3.14159265 - segments * gapAngle) / segments;
+
+    for (int i = 0; i < segments; i++) {
+      final startAngle = i * (segmentAngle + gapAngle);
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: outerRadius),
+        startAngle,
+        segmentAngle,
+        false,
+        outerPaint,
+      );
+    }
+
+    // 中心实心圆
+    final innerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(center, 5.0, innerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _LocateIconPainter oldDelegate) {
+    return oldDelegate.color != color;
   }
 }
