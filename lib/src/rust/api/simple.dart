@@ -8,3 +8,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 String greet({required String name}) =>
     RustLib.instance.api.crateApiSimpleGreet(name: name);
+
+/// 设置应用数据目录（Android 上需要从 Dart 端传入）
+void setAppDataDir({required String path}) =>
+    RustLib.instance.api.crateApiSimpleSetAppDataDir(path: path);

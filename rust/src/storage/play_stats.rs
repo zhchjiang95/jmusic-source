@@ -20,25 +20,7 @@ struct PlayStatsEntry {
 
 /// 获取播放统计文件路径
 fn stats_path() -> PathBuf {
-    let home_dir = {
-        #[cfg(any(target_os = "macos", target_os = "linux", target_os = "ios"))]
-        {
-            PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string()))
-        }
-        #[cfg(target_os = "windows")]
-        {
-            PathBuf::from(
-                std::env::var("USERPROFILE")
-                    .unwrap_or_else(|_| "C:\\".to_string()),
-            )
-        }
-        #[cfg(target_os = "android")]
-        {
-            PathBuf::from("/data/local/tmp")
-        }
-    };
-
-    let data_dir = home_dir.join(".jmusic");
+    let data_dir = super::get_app_data_dir();
     fs::create_dir_all(&data_dir).ok();
     data_dir.join("play_stats.json")
 }

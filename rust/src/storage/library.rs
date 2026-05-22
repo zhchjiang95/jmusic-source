@@ -5,37 +5,9 @@ use crate::models::song::Library;
 
 /// 获取应用数据目录
 fn get_data_dir() -> PathBuf {
-    let home = dirs_path();
-    let data_dir = home.join(".jmusic");
+    let data_dir = super::get_app_data_dir();
     fs::create_dir_all(&data_dir).ok();
     data_dir
-}
-
-/// 获取用户主目录
-fn dirs_path() -> PathBuf {
-    #[cfg(target_os = "macos")]
-    {
-        PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string()))
-    }
-    #[cfg(target_os = "windows")]
-    {
-        PathBuf::from(
-            std::env::var("USERPROFILE")
-                .unwrap_or_else(|_| std::env::var("HOMEPATH").unwrap_or_else(|_| "C:\\".to_string())),
-        )
-    }
-    #[cfg(target_os = "linux")]
-    {
-        PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string()))
-    }
-    #[cfg(target_os = "android")]
-    {
-        PathBuf::from("/data/local/tmp")
-    }
-    #[cfg(target_os = "ios")]
-    {
-        PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string()))
-    }
 }
 
 /// 获取歌曲库 JSON 文件路径

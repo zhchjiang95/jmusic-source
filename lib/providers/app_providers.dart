@@ -36,6 +36,7 @@ class PlayerState {
   final String? lrcText; // 原始 LRC 文本（用于保存到文件）
   final List<int>? coverData;
   final bool isLoading;
+  final String? error; // 播放错误信息
 
   const PlayerState({
     this.currentSong,
@@ -50,6 +51,7 @@ class PlayerState {
     this.lrcText,
     this.coverData,
     this.isLoading = false,
+    this.error,
   });
 
   PlayerState copyWith({
@@ -65,9 +67,11 @@ class PlayerState {
     String? lrcText,
     List<int>? coverData,
     bool? isLoading,
+    String? error,
     bool clearLyrics = false,
     bool clearCover = false,
     bool clearSong = false,
+    bool clearError = false,
   }) {
     return PlayerState(
       currentSong: clearSong ? null : (currentSong ?? this.currentSong),
@@ -82,6 +86,7 @@ class PlayerState {
       lrcText: clearLyrics ? null : (lrcText ?? this.lrcText),
       coverData: clearCover ? null : (coverData ?? this.coverData),
       isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 }
@@ -101,7 +106,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
     ref.onDispose(() {
       _positionTimer?.cancel();
       try {
-        rust_player.playerStop();
+        if (!Platform.isAndroid) {
+          rust_player.playerStop();
+        }
       } catch (_) {}
     });
     return const PlayerState();
@@ -109,8 +116,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 初始化音频引擎
   void _initEngine() {
+    if (Platform.isAndroid) {
+      // Android 上使用原生 MediaPlayer，不需要初始化 Rust 音频引擎
+      print('Android: 使用原生 MediaPlayer');
+      return;
+    }
     try {
       rust_player.playerInit();
+      print('音频引擎初始化成功');
     } catch (e) {
       print('音频引擎初始化失败: $e');
     }
@@ -165,11 +178,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
       isLoading: true,
       clearLyrics: true,
       clearCover: true,
+      clearError: true,
     );
 
     try {
-      rust_player.playerPlay(filePath: song.filePath);
-      rust_player.playerSetVolume(volume: state.volume);
+      if (Platform.isAndroid) {
+        await _androidPlayer('play', song.filePath);
+        await _androidPlayer('setVolume', state.volume.toString());
+      } else {
+        rust_player.playerPlay(filePath: song.filePath);
+        rust_player.playerSetVolume(volume: state.volume);
+      }
 
       state = state.copyWith(
         currentSong: song,
@@ -192,8 +211,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
       _startPositionTimer();
       _fetchOnlineInfo(song);
     } catch (e) {
-      state = state.copyWith(isPlaying: false, isLoading: false);
+      print('播放失败: $e');
+      state = state.copyWith(
+        isPlaying: false,
+        isLoading: false,
+        error: '播放失败: $e',
+      );
     }
+  }
+
+  static const _playerChannel = MethodChannel('com.jmusic.app/player');
+
+  Future<dynamic> _androidPlayer(String method, String arg) async {
+    return await _playerChannel.invokeMethod(method, arg);
   }
 
   /// 获取歌曲信息：优先读源文件嵌入数据，无则在线获取
@@ -293,11 +323,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 暂停/恢复切换
   void togglePlayPause() {
     if (state.isPlaying) {
-      rust_player.playerPause();
+      if (Platform.isAndroid) {
+        _androidPlayer('pause', '');
+      } else {
+        rust_player.playerPause();
+      }
       _positionTimer?.cancel();
       state = state.copyWith(isPlaying: false);
     } else {
-      rust_player.playerResume();
+      if (Platform.isAndroid) {
+        _androidPlayer('resume', '');
+      } else {
+        rust_player.playerResume();
+      }
       _startPositionTimer();
       state = state.copyWith(isPlaying: true);
     }
@@ -337,11 +375,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _isSeeking = true;
     state = state.copyWith(position: position);
     try {
-      rust_player.playerSeek(positionSecs: position.inMilliseconds / 1000.0);
-    } catch (_) {
-      // seek 失败（部分格式不支持），忽略错误
-    }
-    // 延迟解除标志，确保定时器至少跳过一个周期
+      if (Platform.isAndroid) {
+        _androidPlayer('seek', (position.inMilliseconds / 1000.0).toString());
+      } else {
+        rust_player.playerSeek(positionSecs: position.inMilliseconds / 1000.0);
+      }
+    } catch (_) {}
     Future.delayed(const Duration(milliseconds: 600), () {
       _isSeeking = false;
     });
@@ -349,7 +388,11 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 设置音量
   void setVolume(double volume) {
-    rust_player.playerSetVolume(volume: volume);
+    if (Platform.isAndroid) {
+      _androidPlayer('setVolume', volume.toString());
+    } else {
+      rust_player.playerSetVolume(volume: volume);
+    }
     state = state.copyWith(volume: volume);
   }
 
@@ -430,11 +473,22 @@ class LibraryNotifier extends Notifier<LibraryState> {
     }
   }
 
-  /// 扫描音乐目录
+  /// 扫描音乐目录（累加模式）
   Future<void> scanDirectory(String dirPath) async {
     state = state.copyWith(isScanning: true, error: null);
     try {
       final library = await rust_scanner.scanAndUpdateLibrary(dirPath: dirPath);
+      state = state.copyWith(songs: library.songs, isScanning: false);
+    } catch (e) {
+      state = state.copyWith(isScanning: false, error: '扫描失败: $e');
+    }
+  }
+
+  /// 扫描音乐目录（覆盖模式）
+  Future<void> scanDirectoryReplace(String dirPath) async {
+    state = state.copyWith(isScanning: true, error: null);
+    try {
+      final library = await rust_scanner.scanAndReplaceLibrary(dirPath: dirPath);
       state = state.copyWith(songs: library.songs, isScanning: false);
     } catch (e) {
       state = state.copyWith(isScanning: false, error: '扫描失败: $e');

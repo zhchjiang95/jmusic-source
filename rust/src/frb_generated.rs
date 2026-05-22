@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 2041270708;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -253069290;
 
 // Section: executor
 
@@ -842,6 +842,39 @@ fn wire__crate__api__scanner__save_all_metadata_impl(
         },
     )
 }
+fn wire__crate__api__scanner__scan_and_replace_library_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "scan_and_replace_library",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_dir_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::scanner::scan_and_replace_library(api_dir_path)?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__scanner__scan_and_update_library_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -942,6 +975,38 @@ fn wire__crate__api__metadata__search_song_online_impl(
                     .await,
                 )
             }
+        },
+    )
+}
+fn wire__crate__api__simple__set_app_data_dir_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "set_app_data_dir",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok = Result::<_, ()>::Ok({
+                    crate::api::simple::set_app_data_dir(api_path);
+                })?;
+                Ok(output_ok)
+            })())
         },
     )
 }
@@ -1294,19 +1359,25 @@ fn pde_ffi_dispatcher_primary_impl(
         }
         24 => wire__crate__api__cache__reset_library_impl(port, ptr, rust_vec_len, data_len),
         25 => wire__crate__api__scanner__save_all_metadata_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__scanner__scan_and_update_library_impl(
+        26 => wire__crate__api__scanner__scan_and_replace_library_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        27 => {
+        27 => wire__crate__api__scanner__scan_and_update_library_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        28 => {
             wire__crate__api__scanner__scan_music_directory_impl(port, ptr, rust_vec_len, data_len)
         }
-        28 => {
+        29 => {
             wire__crate__api__metadata__search_song_online_impl(port, ptr, rust_vec_len, data_len)
         }
-        29 => {
+        31 => {
             wire__crate__api__scanner__update_song_metadata_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -1338,6 +1409,7 @@ fn pde_ffi_dispatcher_sync_impl(
         19 => wire__crate__api__player__player_set_volume_impl(ptr, rust_vec_len, data_len),
         20 => wire__crate__api__player__player_stop_impl(ptr, rust_vec_len, data_len),
         23 => wire__crate__api__play_stats__record_play_impl(ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__simple__set_app_data_dir_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

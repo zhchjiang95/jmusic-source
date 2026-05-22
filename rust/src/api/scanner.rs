@@ -170,6 +170,26 @@ pub fn scan_and_update_library(dir_path: String) -> Result<Library, String> {
     Ok(library)
 }
 
+/// 扫描并替换歌曲库（覆盖模式：清空后只保留新扫描的目录）
+#[flutter_rust_bridge::frb]
+pub fn scan_and_replace_library(dir_path: String) -> Result<Library, String> {
+    // 扫描新目录
+    let new_songs = scan_music_directory(dir_path.clone())?;
+
+    let mut library = Library::new();
+    library.songs = new_songs;
+    library.scan_dirs = vec![dir_path];
+    library.last_scan_at = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // 保存到 JSON
+    save_library(&library)?;
+
+    Ok(library)
+}
+
 /// 获取当前歌曲库
 #[flutter_rust_bridge::frb(sync)]
 pub fn get_library() -> Library {

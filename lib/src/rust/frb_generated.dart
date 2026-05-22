@@ -73,7 +73,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => 2041270708;
+  int get rustContentHash => -253069290;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -147,6 +147,10 @@ abstract class RustLibApi extends BaseApi {
     Uint8List? coverData,
   });
 
+  Future<Library> crateApiScannerScanAndReplaceLibrary({
+    required String dirPath,
+  });
+
   Future<Library> crateApiScannerScanAndUpdateLibrary({
     required String dirPath,
   });
@@ -158,6 +162,8 @@ abstract class RustLibApi extends BaseApi {
   Future<List<QQMusicSearchResult>> crateApiMetadataSearchSongOnline({
     required String keyword,
   });
+
+  void crateApiSimpleSetAppDataDir({required String path});
 
   Future<void> crateApiScannerUpdateSongMetadata({
     required String filePath,
@@ -821,7 +827,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<Library> crateApiScannerScanAndUpdateLibrary({
+  Future<Library> crateApiScannerScanAndReplaceLibrary({
     required String dirPath,
   }) {
     return handler.executeNormal(
@@ -833,6 +839,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             generalizedFrbRustBinding,
             serializer,
             funcId: 26,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_library,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiScannerScanAndReplaceLibraryConstMeta,
+        argValues: [dirPath],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiScannerScanAndReplaceLibraryConstMeta =>
+      const TaskConstMeta(
+        debugName: "scan_and_replace_library",
+        argNames: ["dirPath"],
+      );
+
+  @override
+  Future<Library> crateApiScannerScanAndUpdateLibrary({
+    required String dirPath,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dirPath, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
             port: port_,
           );
         },
@@ -865,7 +904,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -898,7 +937,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 29,
             port: port_,
           );
         },
@@ -920,6 +959,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  void crateApiSimpleSetAppDataDir({required String path}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(path, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiSimpleSetAppDataDirConstMeta,
+        argValues: [path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSimpleSetAppDataDirConstMeta =>
+      const TaskConstMeta(debugName: "set_app_data_dir", argNames: ["path"]);
+
+  @override
   Future<void> crateApiScannerUpdateSongMetadata({
     required String filePath,
     required String title,
@@ -937,7 +999,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 31,
             port: port_,
           );
         },

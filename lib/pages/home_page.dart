@@ -83,6 +83,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     final playerState = ref.watch(playerProvider);
     final theme = Theme.of(context);
 
+    // 监听播放错误
+    ref.listen<PlayerState>(playerProvider, (prev, next) {
+      if (next.error != null && next.error != prev?.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!)),
+        );
+      }
+    });
+
     // 根据搜索关键词过滤歌曲
     final filteredSongs = _searchQuery.isEmpty
         ? libraryState.songs
@@ -493,6 +502,14 @@ class _HomePageState extends ConsumerState<HomePage> {
 
                     return GestureDetector(
                       onSecondaryTapUp: (details) {
+                        _showContextMenu(
+                          context,
+                          ref,
+                          details.globalPosition,
+                          song,
+                        );
+                      },
+                      onLongPressStart: (details) {
                         _showContextMenu(
                           context,
                           ref,
@@ -1255,12 +1272,152 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// 扫描目录
   Future<void> _scanDirectory(WidgetRef ref) async {
-    final result = await FilePicker.platform.getDirectoryPath();
-    if (result != null) {
-      await ref.read(libraryProvider.notifier).scanDirectory(result);
-      final songs = ref.read(libraryProvider).songs;
-      ref.read(playerProvider.notifier).setPlaylist(songs);
+    // Android 上先请求存储权限
+    if (Platform.isAndroid) {
+      await _requestStoragePermission();
+      // 给用户时间去设置页面授权后返回
+      await Future.delayed(const Duration(milliseconds: 500));
     }
+
+    String? dirPath;
+
+    if (Platform.isAndroid) {
+      // Android 上使用原生方式获取真实目录路径
+      const channel = MethodChannel('com.jmusic.app/permissions');
+      try {
+        dirPath = await channel.invokeMethod<String>('pickDirectory');
+      } catch (e) {
+        // fallback 到 file_picker
+        dirPath = await FilePicker.platform.getDirectoryPath();
+      }
+    } else {
+      dirPath = await FilePicker.platform.getDirectoryPath();
+    }
+
+    if (dirPath == null || dirPath.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未选择目录或路径为空')),
+        );
+      }
+      return;
+    }
+
+    // 显示选择的路径（调试用）
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('扫描目录: $dirPath')),
+      );
+    }
+
+    // 如果已有歌曲，弹窗询问覆盖还是累加
+    final libraryState = ref.read(libraryProvider);
+    if (libraryState.songs.isNotEmpty) {
+      final choice = await showDialog<String>(
+        context: context,
+        builder: (ctx) {
+          final theme = Theme.of(ctx);
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E1E2E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: Text(
+              '添加音乐目录',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 16,
+              ),
+            ),
+            content: Text(
+              '当前已有 ${libraryState.songs.length} 首歌曲，请选择导入方式：',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                fontSize: 14,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(null),
+                child: Text(
+                  '取消',
+                  style: TextStyle(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
+              OutlinedButton(
+                onPressed: () => Navigator.of(ctx).pop('replace'),
+                child: const Text('覆盖'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop('append'),
+                child: const Text('累加'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (choice == null) return;
+
+      try {
+        if (choice == 'replace') {
+          await ref.read(libraryProvider.notifier).scanDirectoryReplace(dirPath);
+        } else {
+          await ref.read(libraryProvider.notifier).scanDirectory(dirPath);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('扫描失败: $e')),
+          );
+        }
+        return;
+      }
+    } else {
+      // 没有歌曲时直接扫描
+      try {
+        await ref.read(libraryProvider.notifier).scanDirectory(dirPath);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('扫描失败: $e')),
+          );
+        }
+        return;
+      }
+    }
+
+    final songs = ref.read(libraryProvider).songs;
+    final error = ref.read(libraryProvider).error;
+    ref.read(playerProvider.notifier).setPlaylist(songs);
+
+    if (mounted) {
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('错误: $error')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('扫描完成，共 ${songs.length} 首歌曲')),
+        );
+      }
+    }
+  }
+
+  /// 请求 Android 存储权限
+  Future<void> _requestStoragePermission() async {
+    const channel = MethodChannel('com.jmusic.app/permissions');
+    try {
+      final hasPermission =
+          await channel.invokeMethod<bool>('hasStoragePermission') ?? false;
+      if (!hasPermission) {
+        await channel.invokeMethod('requestStoragePermission');
+        // 等待用户从设置页面返回
+        await Future.delayed(const Duration(seconds: 1));
+      }
+    } catch (_) {}
   }
 
   /// 格式化时长

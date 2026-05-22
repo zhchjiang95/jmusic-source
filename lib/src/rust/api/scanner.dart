@@ -17,6 +17,10 @@ Future<List<Song>> scanMusicDirectory({required String dirPath}) =>
 Future<Library> scanAndUpdateLibrary({required String dirPath}) =>
     RustLib.instance.api.crateApiScannerScanAndUpdateLibrary(dirPath: dirPath);
 
+/// 扫描并替换歌曲库（覆盖模式：清空后只保留新扫描的目录）
+Future<Library> scanAndReplaceLibrary({required String dirPath}) =>
+    RustLib.instance.api.crateApiScannerScanAndReplaceLibrary(dirPath: dirPath);
+
 /// 获取当前歌曲库
 Library getLibrary() => RustLib.instance.api.crateApiScannerGetLibrary();
 
