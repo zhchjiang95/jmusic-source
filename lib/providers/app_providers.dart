@@ -147,11 +147,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
     });
   }
 
-  /// 初始化系统媒体会话（Windows SMTC / macOS Now Playing）
+  /// 初始化系统媒体会话（Windows SMTC / macOS Now Playing / Android MediaSession）
   void _initMediaSession() {
-    if (Platform.isAndroid) return;
+    if (Platform.isAndroid) {
+      // Android: 注册来自 MusicService 的媒体控制事件回调
+      _registerAndroidMediaHandler();
+      return;
+    }
 
-    // 异步获取 HWND（Windows）或直接初始化（macOS）
+    // 桌面端：异步获取 HWND（Windows）或直接初始化（macOS）
     Future(() async {
       int hwnd = 0;
       if (Platform.isWindows) {
@@ -171,6 +175,40 @@ class PlayerNotifier extends Notifier<PlayerState> {
         _startMediaEventPolling();
       } catch (e) {
         print('系统媒体会话初始化失败: $e');
+      }
+    });
+  }
+
+  /// 注册 Android 端 MusicService 的媒体控制事件回调
+  void _registerAndroidMediaHandler() {
+    const channel = MethodChannel('com.jmusic.app/player');
+    channel.setMethodCallHandler((call) async {
+      if (call.method == 'onMediaAction') {
+        final action = call.arguments as String?;
+        if (action == null) return;
+
+        if (action.startsWith('seek:')) {
+          final posMs = int.tryParse(action.substring(5)) ?? 0;
+          seekTo(Duration(milliseconds: posMs));
+        } else {
+          switch (action) {
+            case 'play':
+              if (!state.isPlaying) togglePlayPause();
+              break;
+            case 'pause':
+              if (state.isPlaying) togglePlayPause();
+              break;
+            case 'next':
+              next();
+              break;
+            case 'previous':
+              previous();
+              break;
+            case 'stop':
+              _stopPlayback();
+              break;
+          }
+        }
       }
     });
   }
@@ -230,7 +268,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 同步更新系统媒体会话的元数据
   void _updateMediaSessionMetadata(Song song) {
-    if (Platform.isAndroid) return;
+    if (Platform.isAndroid) {
+      // Android: 通过 MethodChannel 发送元数据给 MusicService
+      try {
+        const channel = MethodChannel('com.jmusic.app/player');
+        final metadata = '${song.title}\n${song.artist}\n${song.album}\n${song.duration}';
+        channel.invokeMethod('updateMetadata', metadata);
+      } catch (_) {}
+      return;
+    }
     try {
       rust_media_session.mediaSessionUpdateMetadata(
         title: song.title,

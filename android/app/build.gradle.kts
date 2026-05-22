@@ -54,6 +54,10 @@ flutter {
     source = "../.."
 }
 
+dependencies {
+    implementation("androidx.media:media:1.7.0")
+}
+
 // Task to copy libc++_shared.so from NDK into jniLibs before merging native libs
 tasks.register("copyLibCppShared") {
     doLast {

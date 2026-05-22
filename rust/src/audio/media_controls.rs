@@ -22,30 +22,34 @@ pub enum MediaEvent {
     SeekTo(f64), // 秒
 }
 
-/// 全局媒体控制实例
-static MEDIA_CONTROLS: LazyLock<Mutex<Option<MediaControlsWrapper>>> =
-    LazyLock::new(|| Mutex::new(None));
-
 /// 事件接收通道
 static EVENT_RECEIVER: LazyLock<Mutex<Option<mpsc::Receiver<MediaEvent>>>> =
     LazyLock::new(|| Mutex::new(None));
 
-/// 包装 MediaControls 使其可以跨线程使用
-#[cfg(not(target_os = "android"))]
-struct MediaControlsWrapper {
-    controls: MediaControls,
-}
+// ===== 桌面平台（Windows / macOS / Linux）=====
 
 #[cfg(not(target_os = "android"))]
-// Safety: MediaControls from souvlaki is Send+Sync
-unsafe impl Send for MediaControlsWrapper {}
-unsafe impl Sync for MediaControlsWrapper {}
+mod desktop {
+    use super::*;
 
-#[cfg(not(target_os = "android"))]
-impl MediaControlsWrapper {
-    fn new(controls: MediaControls) -> Self {
-        Self { controls }
+    /// 包装 MediaControls 使其可以跨线程使用
+    pub(super) struct MediaControlsWrapper {
+        pub controls: MediaControls,
     }
+
+    // Safety: souvlaki's MediaControls is Send+Sync on the platforms we target
+    unsafe impl Send for MediaControlsWrapper {}
+    unsafe impl Sync for MediaControlsWrapper {}
+
+    impl MediaControlsWrapper {
+        pub fn new(controls: MediaControls) -> Self {
+            Self { controls }
+        }
+    }
+
+    /// 全局媒体控制实例
+    pub(super) static MEDIA_CONTROLS: LazyLock<Mutex<Option<MediaControlsWrapper>>> =
+        LazyLock::new(|| Mutex::new(None));
 }
 
 /// 初始化系统媒体控制
@@ -87,7 +91,6 @@ pub fn init_media_controls(hwnd: i64) -> Result<(), String> {
                 MediaControlEvent::Previous => Some(MediaEvent::Previous),
                 MediaControlEvent::Stop => Some(MediaEvent::Stop),
                 MediaControlEvent::SetPosition(pos) => {
-                    // MediaPosition 包含一个 Duration
                     Some(MediaEvent::SeekTo(pos.0.as_secs_f64()))
                 }
                 _ => None,
@@ -103,7 +106,7 @@ pub fn init_media_controls(hwnd: i64) -> Result<(), String> {
         .set_playback(MediaPlayback::Stopped)
         .map_err(|e| format!("设置播放状态失败: {:?}", e))?;
 
-    *MEDIA_CONTROLS.lock().unwrap() = Some(MediaControlsWrapper::new(controls));
+    *desktop::MEDIA_CONTROLS.lock().unwrap() = Some(desktop::MediaControlsWrapper::new(controls));
     *EVENT_RECEIVER.lock().unwrap() = Some(event_rx);
 
     log::info!("系统媒体控制初始化成功");
@@ -119,7 +122,7 @@ pub fn init_media_controls(_hwnd: i64) -> Result<(), String> {
 /// 更新系统媒体控制的元数据（歌曲信息）
 #[cfg(not(target_os = "android"))]
 pub fn update_media_metadata(title: &str, artist: &str, album: &str, duration_secs: f64) {
-    let mut guard = MEDIA_CONTROLS.lock().unwrap();
+    let mut guard = desktop::MEDIA_CONTROLS.lock().unwrap();
     if let Some(wrapper) = guard.as_mut() {
         let duration = if duration_secs > 0.0 {
             Some(Duration::from_secs_f64(duration_secs))
@@ -143,7 +146,7 @@ pub fn update_media_metadata(_title: &str, _artist: &str, _album: &str, _duratio
 /// 更新系统媒体控制的播放状态
 #[cfg(not(target_os = "android"))]
 pub fn update_media_playback(is_playing: bool, position_secs: f64) {
-    let mut guard = MEDIA_CONTROLS.lock().unwrap();
+    let mut guard = desktop::MEDIA_CONTROLS.lock().unwrap();
     if let Some(wrapper) = guard.as_mut() {
         let playback = if is_playing {
             MediaPlayback::Playing {
@@ -164,7 +167,7 @@ pub fn update_media_playback(_is_playing: bool, _position_secs: f64) {}
 /// 设置播放状态为停止
 #[cfg(not(target_os = "android"))]
 pub fn update_media_stopped() {
-    let mut guard = MEDIA_CONTROLS.lock().unwrap();
+    let mut guard = desktop::MEDIA_CONTROLS.lock().unwrap();
     if let Some(wrapper) = guard.as_mut() {
         let _ = wrapper.controls.set_playback(MediaPlayback::Stopped);
     }
