@@ -13,6 +13,10 @@ flutter_rust_bridge = "=2.11.1"
 rodio = { version = "0.20", features = ["symphonia-all"] }
 symphonia = { version = "0.5", features = ["all"] }
 
+# 系统媒体控制（SMTC / Now Playing / MPRIS）
+[target.'cfg(not(target_os = "android"))'.dependencies]
+souvlaki = "0.8"
+
 # 音频元数据读取（标题、歌手、专辑、封面等）
 lofty = "0.22"
 

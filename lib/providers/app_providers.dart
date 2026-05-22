@@ -8,6 +8,7 @@ import 'package:jmusic/src/rust/api/player.dart' as rust_player;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
 import 'package:jmusic/src/rust/api/play_stats.dart' as rust_play_stats;
+import 'package:jmusic/src/rust/api/media_session.dart' as rust_media_session;
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
 
@@ -95,12 +96,15 @@ class PlayerState {
 /// 播放器状态管理（Riverpod 3.x Notifier）
 class PlayerNotifier extends Notifier<PlayerState> {
   Timer? _positionTimer;
+  Timer? _mediaEventTimer;
   bool _isSeeking = false;
 
   @override
   PlayerState build() {
     // 初始化时启动音频引擎
     _initEngine();
+    // 初始化系统媒体会话
+    _initMediaSession();
     // 初始化时设置默认的原生窗口和托盘提示
     NativeUtils.updateTitle('JMusic');
     // 注册托盘播放控制回调
@@ -108,6 +112,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     // 清理定时器
     ref.onDispose(() {
       _positionTimer?.cancel();
+      _mediaEventTimer?.cancel();
       try {
         if (!Platform.isAndroid) {
           rust_player.playerStop();
@@ -142,6 +147,119 @@ class PlayerNotifier extends Notifier<PlayerState> {
     });
   }
 
+  /// 初始化系统媒体会话（Windows SMTC / macOS Now Playing）
+  void _initMediaSession() {
+    if (Platform.isAndroid) return;
+
+    // 异步获取 HWND（Windows）或直接初始化（macOS）
+    Future(() async {
+      int hwnd = 0;
+      if (Platform.isWindows) {
+        try {
+          const channel = MethodChannel('com.jmusic.app/tray');
+          hwnd = await channel.invokeMethod<int>('getHwnd') ?? 0;
+        } catch (e) {
+          print('获取窗口句柄失败: $e');
+          return;
+        }
+      }
+
+      try {
+        rust_media_session.mediaSessionInit(hwnd: hwnd);
+        print('系统媒体会话初始化成功');
+        // 启动媒体事件轮询
+        _startMediaEventPolling();
+      } catch (e) {
+        print('系统媒体会话初始化失败: $e');
+      }
+    });
+  }
+
+  /// 启动系统媒体控制事件轮询
+  void _startMediaEventPolling() {
+    _mediaEventTimer?.cancel();
+    _mediaEventTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _pollMediaEvents();
+    });
+  }
+
+  /// 轮询并处理系统媒体控制事件
+  void _pollMediaEvents() {
+    if (Platform.isAndroid) return;
+    try {
+      final event = rust_media_session.mediaSessionPollEvent();
+      if (event == null) return;
+
+      switch (event.action) {
+        case 'play':
+        case 'toggle':
+          togglePlayPause();
+          break;
+        case 'pause':
+          if (state.isPlaying) togglePlayPause();
+          break;
+        case 'next':
+          next();
+          break;
+        case 'previous':
+          previous();
+          break;
+        case 'stop':
+          _stopPlayback();
+          break;
+        case 'seek':
+          seekTo(Duration(
+            milliseconds: (event.positionSecs * 1000).toInt(),
+          ));
+          break;
+      }
+    } catch (_) {}
+  }
+
+  /// 停止播放
+  void _stopPlayback() {
+    if (Platform.isAndroid) {
+      _androidPlayer('stop', '');
+    } else {
+      rust_player.playerStop();
+    }
+    _positionTimer?.cancel();
+    state = state.copyWith(isPlaying: false, position: Duration.zero);
+    _updateMediaSessionStopped();
+  }
+
+  /// 同步更新系统媒体会话的元数据
+  void _updateMediaSessionMetadata(Song song) {
+    if (Platform.isAndroid) return;
+    try {
+      rust_media_session.mediaSessionUpdateMetadata(
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        durationSecs: song.duration,
+      );
+    } catch (_) {}
+  }
+
+  /// 同步更新系统媒体会话的播放状态
+  void _updateMediaSessionPlayback(bool isPlaying, Duration position) {
+    if (Platform.isAndroid) return;
+    try {
+      rust_media_session.mediaSessionUpdatePlayback(
+        isPlaying: isPlaying,
+        positionSecs: position.inMilliseconds / 1000.0,
+      );
+    } catch (_) {}
+  }
+
+  /// 同步更新系统媒体会话为停止状态
+  void _updateMediaSessionStopped() {
+    if (Platform.isAndroid) return;
+    try {
+      rust_media_session.mediaSessionUpdateStopped();
+    } catch (_) {}
+  }
+
   /// 初始化音频引擎
   void _initEngine() {
     if (Platform.isAndroid) {
@@ -160,6 +278,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 开始定时更新播放进度
   void _startPositionTimer() {
     _positionTimer?.cancel();
+    int tickCount = 0;
     _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       // seek 期间跳过更新，防止覆盖用户设置的新位置
       if (_isSeeking) return;
@@ -171,6 +290,11 @@ class PlayerNotifier extends Notifier<PlayerState> {
           state = state.copyWith(position: newPos);
           // 同步更新桌面悬浮歌词
           _updateOverlayLyrics(newPos.inMilliseconds);
+          // 每 5 秒同步一次系统媒体会话的播放进度
+          tickCount++;
+          if (tickCount % 10 == 0) {
+            _updateMediaSessionPlayback(true, newPos);
+          }
         }
       }
     });
@@ -277,6 +401,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
       // 播放歌曲时更新原生托盘及窗口标题
       NativeUtils.updateTitle('${song.title} - ${song.artist}');
 
+      // 更新系统媒体会话
+      _updateMediaSessionMetadata(song);
+      _updateMediaSessionPlayback(true, Duration.zero);
+
       _startPositionTimer();
       _fetchOnlineInfo(song);
     } catch (e) {
@@ -360,6 +488,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
           state = state.copyWith(currentSong: updatedSong);
           // 在线更新了歌曲或歌手信息后，同步刷新原生托盘和窗口标题
           NativeUtils.updateTitle('${updatedSong.title} - ${updatedSong.artist}');
+          // 同步更新系统媒体会话元数据
+          _updateMediaSessionMetadata(updatedSong);
         }
 
         // 歌词（嵌入数据没有时才在线获取）
@@ -404,6 +534,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       }
       _positionTimer?.cancel();
       state = state.copyWith(isPlaying: false);
+      _updateMediaSessionPlayback(false, state.position);
     } else {
       if (Platform.isAndroid) {
         _androidPlayer('resume', '');
@@ -412,6 +543,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       }
       _startPositionTimer();
       state = state.copyWith(isPlaying: true);
+      _updateMediaSessionPlayback(true, state.position);
     }
   }
 

@@ -7,6 +7,7 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/cache.dart';
+import 'api/media_session.dart';
 import 'api/metadata.dart';
 import 'api/play_stats.dart';
 import 'api/player.dart';
@@ -34,10 +35,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_bool(dynamic raw);
 
   @protected
+  MediaControlEvent dco_decode_box_autoadd_media_control_event(dynamic raw);
+
+  @protected
   double dco_decode_f_32(dynamic raw);
 
   @protected
   double dco_decode_f_64(dynamic raw);
+
+  @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
   Library dco_decode_library(dynamic raw);
@@ -70,7 +77,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Lyrics dco_decode_lyrics(dynamic raw);
 
   @protected
+  MediaControlEvent dco_decode_media_control_event(dynamic raw);
+
+  @protected
   String? dco_decode_opt_String(dynamic raw);
+
+  @protected
+  MediaControlEvent? dco_decode_opt_box_autoadd_media_control_event(
+    dynamic raw,
+  );
 
   @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
@@ -106,10 +121,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
+  MediaControlEvent sse_decode_box_autoadd_media_control_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   double sse_decode_f_32(SseDeserializer deserializer);
 
   @protected
   double sse_decode_f_64(SseDeserializer deserializer);
+
+  @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
   Library sse_decode_library(SseDeserializer deserializer);
@@ -146,7 +169,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Lyrics sse_decode_lyrics(SseDeserializer deserializer);
 
   @protected
+  MediaControlEvent sse_decode_media_control_event(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
+
+  @protected
+  MediaControlEvent? sse_decode_opt_box_autoadd_media_control_event(
+    SseDeserializer deserializer,
+  );
 
   @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -187,10 +220,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_media_control_event(
+    MediaControlEvent self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_f_32(double self, SseSerializer serializer);
 
   @protected
   void sse_encode_f_64(double self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_library(Library self, SseSerializer serializer);
@@ -235,7 +277,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_lyrics(Lyrics self, SseSerializer serializer);
 
   @protected
+  void sse_encode_media_control_event(
+    MediaControlEvent self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_media_control_event(
+    MediaControlEvent? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_list_prim_u_8_strict(

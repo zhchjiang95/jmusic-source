@@ -128,6 +128,11 @@ bool FlutterWindow::OnCreate() {
           // 查询悬浮歌词是否可见
           bool visible = lyrics_overlay_ && lyrics_overlay_->IsVisible();
           result->Success(flutter::EncodableValue(visible));
+        } else if (call.method_name().compare("getHwnd") == 0) {
+          // 返回窗口句柄（HWND）给 Dart 端，用于初始化系统媒体控制
+          HWND hwnd = GetHandle();
+          int64_t hwnd_value = reinterpret_cast<int64_t>(hwnd);
+          result->Success(flutter::EncodableValue(hwnd_value));
         } else if (call.method_name().compare("updatePlayMode") == 0) {
           // 更新当前播放模式文本（用于托盘菜单显示）
           const auto* arguments = std::get_if<std::string>(call.arguments());
