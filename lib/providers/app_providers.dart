@@ -141,9 +141,47 @@ class PlayerNotifier extends Notifier<PlayerState> {
           _onPlaybackFinished();
         } else {
           state = state.copyWith(position: newPos);
+          // 同步更新桌面悬浮歌词
+          _updateOverlayLyrics(newPos.inMilliseconds);
         }
       }
     });
+  }
+
+  /// 更新桌面悬浮歌词显示内容
+  void _updateOverlayLyrics(int currentMs) {
+    final lyrics = state.lyrics;
+    if (lyrics == null || lyrics.lines.isEmpty) {
+      NativeUtils.updateLyricsOverlay('JMusic - 本地音乐播放器', '');
+      return;
+    }
+
+    // 找到当前歌词行索引
+    int currentLineIndex = -1;
+    for (int i = lyrics.lines.length - 1; i >= 0; i--) {
+      if (lyrics.lines[i].timeMs.toInt() <= currentMs) {
+        currentLineIndex = i;
+        break;
+      }
+    }
+
+    String currentLine = '';
+    String nextLine = '';
+
+    if (currentLineIndex >= 0) {
+      currentLine = lyrics.lines[currentLineIndex].text;
+    }
+    if (currentLineIndex + 1 < lyrics.lines.length) {
+      nextLine = lyrics.lines[currentLineIndex + 1].text;
+    }
+
+    // 如果当前行和下一行都为空（可能歌词还没开始），显示默认文本
+    if (currentLine.isEmpty && nextLine.isEmpty) {
+      NativeUtils.updateLyricsOverlay('JMusic - 本地音乐播放器', '');
+      return;
+    }
+
+    NativeUtils.updateLyricsOverlay(currentLine, nextLine);
   }
 
   /// 播放结束处理
@@ -180,6 +218,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
       clearCover: true,
       clearError: true,
     );
+
+    // 切歌时显示默认文本
+    NativeUtils.updateLyricsOverlay('JMusic - 本地音乐播放器', '');
 
     try {
       if (Platform.isAndroid) {
@@ -591,6 +632,50 @@ class NativeUtils {
       await _channel.invokeMethod('updateTitle', title);
     } catch (e) {
       print('更新原生托盘和任务栏标题失败: $e');
+    }
+  }
+
+  /// 显示桌面悬浮歌词
+  static Future<void> showLyricsOverlay() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod('showLyricsOverlay');
+    } catch (e) {
+      print('显示桌面歌词失败: $e');
+    }
+  }
+
+  /// 隐藏桌面悬浮歌词
+  static Future<void> hideLyricsOverlay() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod('hideLyricsOverlay');
+    } catch (e) {
+      print('隐藏桌面歌词失败: $e');
+    }
+  }
+
+  /// 更新桌面悬浮歌词文本
+  static Future<void> updateLyricsOverlay(String currentLine, String nextLine) async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod('updateLyrics', {
+        'current': currentLine,
+        'next': nextLine,
+      });
+    } catch (e) {
+      // 静默失败，避免频繁打印
+    }
+  }
+
+  /// 查询桌面歌词是否可见
+  static Future<bool> isLyricsOverlayVisible() async {
+    if (!Platform.isWindows) return false;
+    try {
+      final result = await _channel.invokeMethod('isLyricsOverlayVisible');
+      return result == true;
+    } catch (e) {
+      return false;
     }
   }
 }

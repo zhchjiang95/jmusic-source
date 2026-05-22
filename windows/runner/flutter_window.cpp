@@ -36,6 +36,10 @@ bool FlutterWindow::OnCreate() {
       "com.jmusic.app/tray",
       &flutter::StandardMethodCodec::GetInstance());
 
+  // 创建悬浮歌词窗口实例
+  lyrics_overlay_ = std::make_unique<LyricsOverlay>();
+  lyrics_overlay_->Create();
+
   method_channel_->SetMethodCallHandler(
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
              std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
@@ -71,6 +75,59 @@ bool FlutterWindow::OnCreate() {
           } else {
             result->Error("BAD_ARGS", "Expected string argument");
           }
+        } else if (call.method_name().compare("showLyricsOverlay") == 0) {
+          // 显示悬浮歌词
+          if (lyrics_overlay_) {
+            lyrics_overlay_->Show(true);
+          }
+          result->Success();
+        } else if (call.method_name().compare("hideLyricsOverlay") == 0) {
+          // 隐藏悬浮歌词
+          if (lyrics_overlay_) {
+            lyrics_overlay_->Show(false);
+          }
+          result->Success();
+        } else if (call.method_name().compare("updateLyrics") == 0) {
+          // 更新歌词文本：参数为 Map {"current": "...", "next": "..."}
+          const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+          if (args) {
+            std::wstring current_line, next_line;
+
+            auto it_current = args->find(flutter::EncodableValue("current"));
+            if (it_current != args->end()) {
+              const auto* s = std::get_if<std::string>(&it_current->second);
+              if (s) {
+                int len = MultiByteToWideChar(CP_UTF8, 0, s->c_str(), -1, nullptr, 0);
+                if (len > 0) {
+                  current_line.resize(len - 1);
+                  MultiByteToWideChar(CP_UTF8, 0, s->c_str(), -1, &current_line[0], len);
+                }
+              }
+            }
+
+            auto it_next = args->find(flutter::EncodableValue("next"));
+            if (it_next != args->end()) {
+              const auto* s = std::get_if<std::string>(&it_next->second);
+              if (s) {
+                int len = MultiByteToWideChar(CP_UTF8, 0, s->c_str(), -1, nullptr, 0);
+                if (len > 0) {
+                  next_line.resize(len - 1);
+                  MultiByteToWideChar(CP_UTF8, 0, s->c_str(), -1, &next_line[0], len);
+                }
+              }
+            }
+
+            if (lyrics_overlay_) {
+              lyrics_overlay_->UpdateLyrics(current_line, next_line);
+            }
+            result->Success();
+          } else {
+            result->Error("BAD_ARGS", "Expected map argument with 'current' and 'next' keys");
+          }
+        } else if (call.method_name().compare("isLyricsOverlayVisible") == 0) {
+          // 查询悬浮歌词是否可见
+          bool visible = lyrics_overlay_ && lyrics_overlay_->IsVisible();
+          result->Success(flutter::EncodableValue(visible));
         } else {
           result->NotImplemented();
         }
@@ -177,8 +234,22 @@ void FlutterWindow::RemoveTrayIcon(HWND hwnd) {
 void FlutterWindow::ShowTrayPopupMenu(HWND hwnd) {
   HMENU hMenu = CreatePopupMenu();
   if (hMenu) {
-    // 菜单项：显示主窗口和退出
+    // 菜单项：显示主窗口、桌面歌词开关、退出
     AppendMenuW(hMenu, MF_STRING, 1001, L"显示主窗口");
+    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+
+    // 桌面歌词开关（根据当前状态显示勾选）
+    bool lyrics_visible = lyrics_overlay_ && lyrics_overlay_->IsVisible();
+    AppendMenuW(hMenu, MF_STRING | (lyrics_visible ? MF_CHECKED : MF_UNCHECKED),
+                1003, L"桌面歌词");
+
+    // 解锁歌词位置（仅在歌词可见时有效）
+    if (lyrics_visible) {
+      bool lyrics_locked = lyrics_overlay_ && lyrics_overlay_->IsLocked();
+      AppendMenuW(hMenu, MF_STRING | (lyrics_locked ? MF_UNCHECKED : MF_CHECKED),
+                  1004, L"解锁歌词位置");
+    }
+
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(hMenu, MF_STRING, 1002, L"退出");
 
@@ -201,6 +272,16 @@ void FlutterWindow::ShowTrayPopupMenu(HWND hwnd) {
       // 标记正在退出程序，并销毁窗口
       is_exiting_ = true;
       DestroyWindow(hwnd);
+    } else if (cmd == 1003) {
+      // 切换桌面歌词显示
+      if (lyrics_overlay_) {
+        lyrics_overlay_->Show(!lyrics_visible);
+      }
+    } else if (cmd == 1004) {
+      // 切换歌词锁定状态
+      if (lyrics_overlay_) {
+        lyrics_overlay_->SetLocked(!lyrics_overlay_->IsLocked());
+      }
     }
   }
 }

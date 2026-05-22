@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "win32_window.h"
+#include "lyrics_overlay.h"
 
 // 自定义系统托盘消息 ID
 #define WM_TRAY_ICON (WM_USER + 100)
@@ -47,6 +48,9 @@ class FlutterWindow : public Win32Window {
 
   // 用于接收 Dart 传递信息的 MethodChannel
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> method_channel_;
+
+  // 桌面悬浮歌词窗口
+  std::unique_ptr<LyricsOverlay> lyrics_overlay_;
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_
