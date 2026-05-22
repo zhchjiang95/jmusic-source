@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -102,6 +103,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _initEngine();
     // 初始化时设置默认的原生窗口和托盘提示
     NativeUtils.updateTitle('JMusic');
+    // 注册托盘播放控制回调
+    _registerTrayHandler();
     // 清理定时器
     ref.onDispose(() {
       _positionTimer?.cancel();
@@ -112,6 +115,31 @@ class PlayerNotifier extends Notifier<PlayerState> {
       } catch (_) {}
     });
     return const PlayerState();
+  }
+
+  /// 注册原生托盘菜单的播放控制回调
+  void _registerTrayHandler() {
+    if (!Platform.isWindows) return;
+    const channel = MethodChannel('com.jmusic.app/tray');
+    channel.setMethodCallHandler((call) async {
+      if (call.method == 'onTrayAction') {
+        final action = call.arguments as String?;
+        switch (action) {
+          case 'togglePlayPause':
+            togglePlayPause();
+            break;
+          case 'previous':
+            previous();
+            break;
+          case 'next':
+            next();
+            break;
+          case 'togglePlayMode':
+            togglePlayMode();
+            break;
+        }
+      }
+    });
   }
 
   /// 初始化音频引擎
@@ -363,6 +391,11 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 暂停/恢复切换
   void togglePlayPause() {
+    if (state.currentSong == null) {
+      // 没有正在播放的歌曲时，随机开始播放一首
+      _playRandom();
+      return;
+    }
     if (state.isPlaying) {
       if (Platform.isAndroid) {
         _androidPlayer('pause', '');
@@ -385,9 +418,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 下一首
   void next() {
     if (state.playlist.isEmpty) return;
+
+    if (state.currentSong == null) {
+      _playRandom();
+      return;
+    }
     
     if (state.playMode == PlayMode.shuffle) {
-      final random = DateTime.now().millisecondsSinceEpoch % state.playlist.length;
+      final random = Random().nextInt(state.playlist.length);
       playSongAt(random);
       return;
     }
@@ -399,9 +437,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 上一首
   void previous() {
     if (state.playlist.isEmpty) return;
+
+    if (state.currentSong == null) {
+      _playRandom();
+      return;
+    }
     
     if (state.playMode == PlayMode.shuffle) {
-      final random = DateTime.now().millisecondsSinceEpoch % state.playlist.length;
+      final random = Random().nextInt(state.playlist.length);
       playSongAt(random);
       return;
     }
@@ -409,6 +452,13 @@ class PlayerNotifier extends Notifier<PlayerState> {
     int prevIndex = state.currentIndex - 1;
     if (prevIndex < 0) prevIndex = state.playlist.length - 1;
     playSongAt(prevIndex);
+  }
+
+  /// 随机播放一首歌（用于没有正在播放歌曲时的首次启动）
+  void _playRandom() {
+    if (state.playlist.isEmpty) return;
+    final index = Random().nextInt(state.playlist.length);
+    playSongAt(index);
   }
 
   /// 跳转到指定位置
@@ -441,7 +491,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
   void togglePlayMode() {
     final modes = PlayMode.values;
     final nextIndex = (state.playMode.index + 1) % modes.length;
-    state = state.copyWith(playMode: modes[nextIndex]);
+    final newMode = modes[nextIndex];
+    state = state.copyWith(playMode: newMode);
+    NativeUtils.updatePlayMode(newMode);
   }
 
   /// 更新当前播放歌曲的元数据和歌词（主要用于导入歌词后的实时同步）
@@ -677,5 +729,22 @@ class NativeUtils {
     } catch (e) {
       return false;
     }
+  }
+
+  /// 更新托盘菜单中显示的播放模式文本
+  static Future<void> updatePlayMode(PlayMode mode) async {
+    if (!Platform.isWindows) return;
+    String label;
+    switch (mode) {
+      case PlayMode.sequential:
+        label = '顺序播放';
+      case PlayMode.shuffle:
+        label = '随机播放';
+      case PlayMode.singleLoop:
+        label = '单曲循环';
+    }
+    try {
+      await _channel.invokeMethod('updatePlayMode', label);
+    } catch (_) {}
   }
 }

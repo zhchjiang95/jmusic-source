@@ -51,6 +51,9 @@ class FlutterWindow : public Win32Window {
 
   // 桌面悬浮歌词窗口
   std::unique_ptr<LyricsOverlay> lyrics_overlay_;
+
+  // 当前播放模式标签（由 Dart 端推送更新）
+  std::wstring current_play_mode_label_ = L"顺序播放";
 };
 
 #endif  // RUNNER_FLUTTER_WINDOW_H_

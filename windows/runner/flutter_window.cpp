@@ -128,6 +128,19 @@ bool FlutterWindow::OnCreate() {
           // 查询悬浮歌词是否可见
           bool visible = lyrics_overlay_ && lyrics_overlay_->IsVisible();
           result->Success(flutter::EncodableValue(visible));
+        } else if (call.method_name().compare("updatePlayMode") == 0) {
+          // 更新当前播放模式文本（用于托盘菜单显示）
+          const auto* arguments = std::get_if<std::string>(call.arguments());
+          if (arguments) {
+            int len = MultiByteToWideChar(CP_UTF8, 0, arguments->c_str(), -1, nullptr, 0);
+            if (len > 0) {
+              current_play_mode_label_.resize(len - 1);
+              MultiByteToWideChar(CP_UTF8, 0, arguments->c_str(), -1, &current_play_mode_label_[0], len);
+            }
+            result->Success();
+          } else {
+            result->Error("BAD_ARGS", "Expected string argument");
+          }
         } else {
           result->NotImplemented();
         }
@@ -234,8 +247,15 @@ void FlutterWindow::RemoveTrayIcon(HWND hwnd) {
 void FlutterWindow::ShowTrayPopupMenu(HWND hwnd) {
   HMENU hMenu = CreatePopupMenu();
   if (hMenu) {
-    // 菜单项：显示主窗口、桌面歌词开关、退出
+    // 菜单项：显示主窗口
     AppendMenuW(hMenu, MF_STRING, 1001, L"显示主窗口");
+    AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
+
+    // 播放控制
+    AppendMenuW(hMenu, MF_STRING, 1005, L"上一曲");
+    AppendMenuW(hMenu, MF_STRING, 1006, L"暂停/播放");
+    AppendMenuW(hMenu, MF_STRING, 1007, L"下一曲");
+    AppendMenuW(hMenu, MF_STRING, 1008, current_play_mode_label_.c_str());
     AppendMenuW(hMenu, MF_SEPARATOR, 0, nullptr);
 
     // 桌面歌词开关（根据当前状态显示勾选）
@@ -281,6 +301,26 @@ void FlutterWindow::ShowTrayPopupMenu(HWND hwnd) {
       // 切换歌词锁定状态
       if (lyrics_overlay_) {
         lyrics_overlay_->SetLocked(!lyrics_overlay_->IsLocked());
+      }
+    } else if (cmd == 1005) {
+      // 上一曲：通过 MethodChannel 通知 Dart
+      if (method_channel_) {
+        method_channel_->InvokeMethod("onTrayAction", std::make_unique<flutter::EncodableValue>("previous"));
+      }
+    } else if (cmd == 1006) {
+      // 暂停/播放
+      if (method_channel_) {
+        method_channel_->InvokeMethod("onTrayAction", std::make_unique<flutter::EncodableValue>("togglePlayPause"));
+      }
+    } else if (cmd == 1007) {
+      // 下一曲
+      if (method_channel_) {
+        method_channel_->InvokeMethod("onTrayAction", std::make_unique<flutter::EncodableValue>("next"));
+      }
+    } else if (cmd == 1008) {
+      // 切换播放模式：顺序 -> 随机 -> 单曲循环
+      if (method_channel_) {
+        method_channel_->InvokeMethod("onTrayAction", std::make_unique<flutter::EncodableValue>("togglePlayMode"));
       }
     }
   }
