@@ -20,24 +20,35 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  final FocusNode _focusNode = FocusNode();
+  final FocusNode _searchFocusNode = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    // 注册全局键盘事件处理，确保焦点不在搜索框时也能响应快捷键
+    HardwareKeyboard.instance.addHandler(_handleHardwareKey);
+  }
+
+  @override
   void dispose() {
-    _focusNode.dispose();
+    HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
+    _searchFocusNode.dispose();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  /// 键盘事件处理
-  void _handleKeyEvent(KeyEvent event) {
-    if (event is! KeyDownEvent) return;
-    // 搜索框聚焦时不处理快捷键
-    if (FocusManager.instance.primaryFocus != _focusNode) return;
+  /// 全局键盘事件处理。返回 true 表示已处理（阻止继续传播）。
+  bool _handleHardwareKey(KeyEvent event) {
+    if (event is! KeyDownEvent) return false;
+    // 搜索框聚焦时（或任何可编辑文本聚焦时）不拦截，避免影响输入
+    if (_searchFocusNode.hasFocus) return false;
+    final focused = FocusManager.instance.primaryFocus;
+    final focusedWidget = focused?.context?.widget;
+    if (focusedWidget is EditableText) return false;
 
     final notifier = ref.read(playerProvider.notifier);
     final player = ref.read(playerProvider);
@@ -54,12 +65,21 @@ class _HomePageState extends ConsumerState<HomePage> {
             notifier.playSongAt(Random().nextInt(songs.length));
           }
         }
+        return true;
       case LogicalKeyboardKey.arrowRight:
-        if (player.currentSong != null) notifier.next();
+        if (player.currentSong != null) {
+          notifier.next();
+          return true;
+        }
+        return false;
       case LogicalKeyboardKey.arrowLeft:
-        if (player.currentSong != null) notifier.previous();
+        if (player.currentSong != null) {
+          notifier.previous();
+          return true;
+        }
+        return false;
       default:
-        break;
+        return false;
     }
   }
 
@@ -72,9 +92,24 @@ class _HomePageState extends ConsumerState<HomePage> {
         .where(
           (s) =>
               s.title.toLowerCase().contains(q) ||
-              s.artist.toLowerCase().contains(q),
+              s.artist.toLowerCase().contains(q) ||
+              s.album.toLowerCase().contains(q),
         )
         .toList();
+  }
+
+  /// 用专辑名搜索：把专辑名填充到搜索框并触发过滤
+  void _searchByAlbum(String album) {
+    if (album.isEmpty) return;
+    _searchController.text = album;
+    _searchController.selection = TextSelection.fromPosition(
+      TextPosition(offset: album.length),
+    );
+    setState(() => _searchQuery = album);
+    // 滚回顶部，便于查看搜索结果
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
   }
 
   @override
@@ -98,14 +133,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         : libraryState.songs.where((song) {
             final q = _searchQuery.toLowerCase();
             return song.title.toLowerCase().contains(q) ||
-                song.artist.toLowerCase().contains(q);
+                song.artist.toLowerCase().contains(q) ||
+                song.album.toLowerCase().contains(q);
           }).toList();
 
-    return KeyboardListener(
-      focusNode: _focusNode,
-      autofocus: true,
-      onKeyEvent: _handleKeyEvent,
-      child: Scaffold(
+    return Scaffold(
         body: SafeArea(
           child: Column(
             children: [
@@ -198,9 +230,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                     height: 36,
                     child: TextField(
                       controller: _searchController,
+                      focusNode: _searchFocusNode,
                       style: const TextStyle(fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: '搜索歌曲、歌手...',
+                        hintText: '搜索歌曲、歌手、专辑...',
                         hintStyle: TextStyle(
                           fontSize: 13,
                           color: theme.colorScheme.onSurface.withValues(
@@ -219,8 +252,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 onPressed: () {
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
-                                  // 清除搜索后把焦点还给主页
-                                  _focusNode.requestFocus();
+                                  // 清除搜索后失焦，恢复全局快捷键
+                                  _searchFocusNode.unfocus();
                                 },
                                 icon: Icon(
                                   Icons.close,
@@ -249,8 +282,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                       onChanged: (value) {
                         setState(() => _searchQuery = value);
                       },
-                      // 输入完成后焦点还给主页（恢复快捷键）
-                      onEditingComplete: () => _focusNode.requestFocus(),
+                      // 回车后失焦，恢复全局快捷键
+                      onSubmitted: (_) => _searchFocusNode.unfocus(),
                     ),
                   ),
                 ),
@@ -289,8 +322,7 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   /// 悬浮定位按钮（中心实心圆 + 外圆环）
@@ -593,18 +625,54 @@ class _HomePageState extends ConsumerState<HomePage> {
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                // 专辑
+                                // 专辑（点击搜索此专辑）
                                 Expanded(
                                   flex: 2,
-                                  child: Text(
-                                    song.album.isNotEmpty ? song.album : '-',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: dimColor,
-                                      fontSize: 12,
-                                    ),
-                                  ),
+                                  child: song.album.isNotEmpty
+                                      ? MouseRegion(
+                                          cursor:
+                                              SystemMouseCursors.click,
+                                          child: GestureDetector(
+                                            behavior:
+                                                HitTestBehavior.opaque,
+                                            onTap: () => _searchByAlbum(
+                                              song.album,
+                                            ),
+                                            child: Tooltip(
+                                              message:
+                                                  '搜索此专辑：${song.album}',
+                                              waitDuration: const Duration(
+                                                milliseconds: 500,
+                                              ),
+                                              child: Text(
+                                                song.album,
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: dimColor,
+                                                  fontSize: 12,
+                                                  decoration: TextDecoration
+                                                      .underline,
+                                                  decorationColor: dimColor
+                                                      .withValues(alpha: 0.3),
+                                                  decorationStyle:
+                                                      TextDecorationStyle
+                                                          .dotted,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Text(
+                                          '-',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: dimColor,
+                                            fontSize: 12,
+                                          ),
+                                        ),
                                 ),
                                 // 文件大小
                                 SizedBox(
