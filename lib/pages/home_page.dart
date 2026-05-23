@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/providers/macos_status_bar.dart';
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
@@ -119,6 +120,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final playerState = ref.watch(playerProvider);
     final theme = Theme.of(context);
 
+    // 在 macOS 平台主动激活菜单栏歌词控制器（懒加载 Provider 必须有人 watch 才会 build）
+    if (Platform.isMacOS) {
+      ref.watch(macosStatusBarControllerProvider);
+    }
+
     // 监听播放错误
     ref.listen<PlayerState>(playerProvider, (prev, next) {
       if (next.error != null && next.error != prev?.error) {
@@ -219,6 +225,17 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                       tooltip: '播放统计',
                     ),
+                    // macOS 端的设置入口：仅在 macOS 显示
+                    if (Platform.isMacOS)
+                      IconButton(
+                        onPressed: () => _showMacosSettingsDialog(context),
+                        icon: Icon(
+                          Icons.settings_outlined,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                        tooltip: '设置',
+                      ),
                   ],
                 ),
               ),
@@ -1501,6 +1518,53 @@ class _HomePageState extends ConsumerState<HomePage> {
     final mins = (seconds ~/ 60).toString().padLeft(2, '0');
     final secs = (seconds.toInt() % 60).toString().padLeft(2, '0');
     return '$mins:$secs';
+  }
+
+  /// macOS 端设置对话框：目前仅包含「在菜单栏显示歌词」开关。
+  /// 该对话框只会在 macOS 上被打开（入口按钮通过 `Platform.isMacOS` 门控）。
+  void _showMacosSettingsDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('设置'),
+          contentPadding: const EdgeInsets.fromLTRB(8, 16, 8, 8),
+          content: SizedBox(
+            width: 360,
+            child: Consumer(
+              builder: (context, ref, _) {
+                final enabled = ref.watch(
+                  macosStatusBarControllerProvider.select((s) => s.enabled),
+                );
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwitchListTile(
+                      title: const Text('在菜单栏显示歌词'),
+                      subtitle: const Text(
+                        '在 macOS 系统菜单栏实时显示当前播放的歌词',
+                      ),
+                      value: enabled,
+                      onChanged: (v) {
+                        ref
+                            .read(macosStatusBarControllerProvider.notifier)
+                            .setEnabled(v);
+                      },
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('完成'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
 

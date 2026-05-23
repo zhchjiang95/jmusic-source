@@ -12,6 +12,7 @@
 - 🔁 **播放模式** — 顺序播放 / 单曲循环 / 随机播放
 - 🖥️ **全屏歌词** — 沉浸式歌词浏览，支持长歌词自动换行左对齐并平滑滚动居中
 - 🎤 **桌面悬浮歌词**（Windows）— 透明置顶窗口实时显示当前歌词+下一行，支持拖拽定位、字号调节、鼠标穿透锁定
+- 🍎 **菜单栏歌词**（macOS）— 系统状态栏实时显示当前歌词，可通过状态栏菜单完成播放/暂停、上一首、下一首、显示主窗口、关闭等操作；关闭主窗口仅隐藏，应用继续在后台运行
 
 ## 🏗️ 技术架构
 
@@ -44,8 +45,21 @@ lib/
 │   ├── mini_player.dart  # 底部迷你播放栏
 │   └── lyrics_view.dart  # 歌词滚动组件
 └── providers/
-    └── app_providers.dart # Riverpod 状态管理
+    ├── app_providers.dart      # Riverpod 状态管理
+    └── macos_status_bar.dart   # macOS 菜单栏歌词控制器
 ```
+
+### macOS 原生模块
+
+```
+macos/Runner/
+├── AppDelegate.swift                  # 启动注册 / 关闭按钮策略 / Dock 重新激活 / 退出清理
+├── MainFlutterWindow.swift            # 在 awakeFromNib 中 attach 状态栏歌词控制器
+├── MainWindowDelegate.swift           # windowShouldClose 拦截：关闭=隐藏不退出
+└── StatusBarLyricsController.swift    # NSStatusItem + NSMenu + setText 去重
+```
+
+菜单栏歌词的 Dart 端通过 `MethodChannel('com.jmusic.app/macos_status_bar')` 与 Swift 端通信：Dart 推送 `setEnabled / setText / showMainWindow / dispose`，Swift 端把菜单点击通过 `onMenuAction` 回送给 Dart。偏好以 Dart 端 `SharedPreferences` 为唯一来源，键为 `status_bar_lyrics_enabled`，默认启用。
 
 ## 📦 下载与安装 (macOS)
 
