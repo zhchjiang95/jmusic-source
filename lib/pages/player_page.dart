@@ -92,13 +92,6 @@ class PlayerPage extends ConsumerWidget {
             icon: const Icon(Icons.keyboard_arrow_down, size: 32),
           ),
           const Spacer(),
-          Text(
-            '正在播放',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-          ),
-          const Spacer(),
           // 保存信息到文件
           Consumer(
             builder: (context, ref, _) {

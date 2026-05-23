@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
+import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
 import 'package:jmusic/widgets/mini_player.dart';
 import 'package:jmusic/pages/play_stats_page.dart';
 
@@ -474,16 +475,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Text(
                   '专辑',
-                  style: TextStyle(color: dimColor, fontSize: 12),
-                ),
-              ),
-              SizedBox(
-                width: 60,
-                child: Text(
-                  '大小',
                   style: TextStyle(color: dimColor, fontSize: 12),
                 ),
               ),
@@ -627,7 +621,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 const SizedBox(width: 8),
                                 // 专辑（点击搜索此专辑）
                                 Expanded(
-                                  flex: 2,
+                                  flex: 3,
                                   child: song.album.isNotEmpty
                                       ? MouseRegion(
                                           cursor:
@@ -673,17 +667,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                                             fontSize: 12,
                                           ),
                                         ),
-                                ),
-                                // 文件大小
-                                SizedBox(
-                                  width: 60,
-                                  child: Text(
-                                    _formatFileSize(song.fileSize.toInt()),
-                                    style: TextStyle(
-                                      color: dimColor,
-                                      fontSize: 12,
-                                    ),
-                                  ),
                                 ),
                                 // 格式
                                 SizedBox(
@@ -741,6 +724,21 @@ class _HomePageState extends ConsumerState<HomePage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
         PopupMenuItem(
+          value: 'info',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              const Text('查看音乐信息', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
           value: 'edit',
           height: 36,
           child: Row(
@@ -783,7 +781,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ],
     ).then((value) {
-      if (value == 'edit') {
+      if (value == 'info') {
+        _showSongInfoDialog(context, ref, song);
+      } else if (value == 'edit') {
         _showEditDialog(context, ref, song);
       } else if (value == 'import_lyrics') {
         _showImportLyricsDialog(context, ref, song);
@@ -791,6 +791,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         _showEditCoverDialog(context, ref, song);
       }
     });
+  }
+
+  /// 查看音乐详细信息对话框
+  void _showSongInfoDialog(BuildContext context, WidgetRef ref, Song song) {
+    showDialog(
+      context: context,
+      builder: (ctx) => _SongInfoDialog(song: song),
+    );
   }
 
   /// 编辑歌曲信息对话框
@@ -1494,13 +1502,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     final secs = (seconds.toInt() % 60).toString().padLeft(2, '0');
     return '$mins:$secs';
   }
-
-  /// 格式化文件大小
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
 }
 
 /// 定位图标绘制器：中心实心圆 + 外圆环（虚线效果）
@@ -1547,5 +1548,438 @@ class _LocateIconPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _LocateIconPainter oldDelegate) {
     return oldDelegate.color != color;
+  }
+}
+
+/// 详细信息字段（标签 + 值）
+class _InfoEntry {
+  final String label;
+  final String value;
+  final bool monospace;
+
+  const _InfoEntry(
+    this.label,
+    this.value, {
+    this.monospace = false,
+  });
+}
+
+/// 音乐详细信息弹窗
+///
+/// 尽量从 Song 模型 + 文件系统 + 嵌入标签中提取所有可读信息：
+/// - 基础：标题 / 歌手 / 专辑
+/// - 文件：路径、目录、文件名、扩展名、字节大小、修改时间
+/// - 音频：时长、格式、估算码率
+/// - 在线：QQ songmid / albummid（如果已匹配）
+/// - 嵌入：封面尺寸 / 是否有内嵌歌词及字符数
+class _SongInfoDialog extends StatefulWidget {
+  final Song song;
+
+  const _SongInfoDialog({required this.song});
+
+  @override
+  State<_SongInfoDialog> createState() => _SongInfoDialogState();
+}
+
+class _SongInfoDialogState extends State<_SongInfoDialog> {
+  Uint8List? _coverBytes;
+  bool _coverLoading = true;
+  int? _coverByteCount;
+
+  bool _embeddedLyricsLoading = true;
+  String? _embeddedLyrics;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmbeddedAssets();
+  }
+
+  Future<void> _loadEmbeddedAssets() async {
+    // 嵌入封面
+    try {
+      final cover = await rust_scanner.readEmbeddedCover(
+        filePath: widget.song.filePath,
+      );
+      if (mounted) {
+        setState(() {
+          _coverBytes = cover;
+          _coverByteCount = cover?.length;
+          _coverLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _coverLoading = false);
+    }
+
+    // 嵌入歌词
+    try {
+      final lrc = await rust_scanner.readEmbeddedLyrics(
+        filePath: widget.song.filePath,
+      );
+      if (mounted) {
+        setState(() {
+          _embeddedLyrics = lrc;
+          _embeddedLyricsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _embeddedLyricsLoading = false);
+    }
+  }
+
+  // —— 工具函数 ——
+
+  String _humanSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(2)} KB';
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  String _humanDuration(double seconds) {
+    if (seconds <= 0) return '-';
+    final total = seconds.toInt();
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+    final ms = ((seconds - total) * 1000).toInt();
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:'
+          '${m.toString().padLeft(2, '0')}:'
+          '${s.toString().padLeft(2, '0')}'
+          '.${ms.toString().padLeft(3, '0')}';
+    }
+    return '${m.toString().padLeft(2, '0')}:'
+        '${s.toString().padLeft(2, '0')}'
+        '.${ms.toString().padLeft(3, '0')}';
+  }
+
+  String _humanTimestamp(BigInt secondsSinceEpoch) {
+    if (secondsSinceEpoch == BigInt.zero) return '-';
+    final dt = DateTime.fromMillisecondsSinceEpoch(
+      (secondsSinceEpoch * BigInt.from(1000)).toInt(),
+      isUtc: false,
+    );
+    String pad(int v) => v.toString().padLeft(2, '0');
+    return '${dt.year}-${pad(dt.month)}-${pad(dt.day)} '
+        '${pad(dt.hour)}:${pad(dt.minute)}:${pad(dt.second)}';
+  }
+
+  String _estimatedBitrate(BigInt fileSize, double duration) {
+    if (duration <= 0) return '-';
+    final bits = fileSize.toInt() * 8;
+    final kbps = bits / duration / 1000;
+    return '${kbps.toStringAsFixed(0)} kbps（估算）';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final song = widget.song;
+
+    final filePath = song.filePath;
+    final separator = filePath.contains('\\') ? '\\' : '/';
+    final lastSep = filePath.lastIndexOf(separator);
+    final fileName = lastSep >= 0 ? filePath.substring(lastSep + 1) : filePath;
+    final dirPath = lastSep >= 0 ? filePath.substring(0, lastSep) : '-';
+    final dotIdx = fileName.lastIndexOf('.');
+    final baseName = dotIdx > 0 ? fileName.substring(0, dotIdx) : fileName;
+
+    final entries = <_InfoEntry>[
+      _InfoEntry('标题', song.title.isEmpty ? '-' : song.title),
+      _InfoEntry('歌手', song.artist.isEmpty ? '-' : song.artist),
+      _InfoEntry('专辑', song.album.isEmpty ? '-' : song.album),
+      _InfoEntry('时长', _humanDuration(song.duration)),
+      _InfoEntry('格式', song.format.toUpperCase()),
+      _InfoEntry(
+        '文件大小',
+        '${_humanSize(song.fileSize.toInt())}'
+            '（${song.fileSize} B）',
+      ),
+      _InfoEntry('估算码率', _estimatedBitrate(song.fileSize, song.duration)),
+      _InfoEntry('文件名', fileName, monospace: true),
+      _InfoEntry('基础名', baseName, monospace: true),
+      _InfoEntry('所在目录', dirPath, monospace: true),
+      _InfoEntry('完整路径', filePath, monospace: true),
+      _InfoEntry('修改时间', _humanTimestamp(song.modifiedAt)),
+      _InfoEntry(
+        '修改时间戳',
+        '${song.modifiedAt} (Unix 秒)',
+        monospace: true,
+      ),
+      _InfoEntry(
+        'QQ songmid',
+        (song.songmid == null || song.songmid!.isEmpty)
+            ? '-（未匹配）'
+            : song.songmid!,
+        monospace: true,
+      ),
+      _InfoEntry(
+        'QQ albummid',
+        (song.albummid == null || song.albummid!.isEmpty)
+            ? '-（未匹配）'
+            : song.albummid!,
+        monospace: true,
+      ),
+      _InfoEntry(
+        '内嵌封面',
+        _coverLoading
+            ? '正在读取...'
+            : (_coverByteCount == null
+                ? '无'
+                : '有，${_humanSize(_coverByteCount!)}'),
+      ),
+      _InfoEntry(
+        '内嵌歌词',
+        _embeddedLyricsLoading
+            ? '正在读取...'
+            : (_embeddedLyrics == null || _embeddedLyrics!.isEmpty
+                ? '无'
+                : '有，${_embeddedLyrics!.length} 字符'),
+      ),
+    ];
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1E1E2E),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      titlePadding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+      contentPadding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      title: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 20,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '音乐信息',
+              style: TextStyle(
+                color: theme.colorScheme.onSurface,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: '复制全部信息',
+            onPressed: () {
+              final buf = StringBuffer();
+              for (final e in entries) {
+                buf.writeln('${e.label}: ${e.value}');
+              }
+              Clipboard.setData(ClipboardData(text: buf.toString()));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('已复制到剪贴板')),
+              );
+            },
+            icon: Icon(
+              Icons.copy_all_outlined,
+              size: 18,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 560,
+        height: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 顶部封面 + 主信息
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildCoverThumb(theme),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SelectableText(
+                          song.title.isEmpty ? '-' : song.title,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        SelectableText(
+                          song.artist.isEmpty ? '-' : song.artist,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.75),
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        SelectableText(
+                          song.album.isEmpty ? '-' : song.album,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.55),
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            _chip(
+                              theme,
+                              song.format.toUpperCase(),
+                            ),
+                            _chip(
+                              theme,
+                              _humanDuration(song.duration),
+                            ),
+                            _chip(
+                              theme,
+                              _humanSize(song.fileSize.toInt()),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Divider(
+                height: 1,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+              ),
+              const SizedBox(height: 4),
+              // 详细字段表
+              ...entries.map((e) => _buildEntryRow(theme, e)),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(
+            '关闭',
+            style: TextStyle(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCoverThumb(ThemeData theme) {
+    Widget child;
+    if (_coverLoading) {
+      child = SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: theme.colorScheme.primary,
+        ),
+      );
+    } else if (_coverBytes != null) {
+      child = Image.memory(_coverBytes!, fit: BoxFit.cover);
+    } else {
+      child = Icon(
+        Icons.music_note,
+        size: 32,
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.3),
+      );
+    }
+    return Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      clipBehavior: Clip.antiAlias,
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
+
+  Widget _chip(ThemeData theme, String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: theme.colorScheme.primary,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEntryRow(ThemeData theme, _InfoEntry e) {
+    final labelColor = theme.colorScheme.onSurface.withValues(alpha: 0.55);
+    final valueColor = theme.colorScheme.onSurface.withValues(alpha: 0.95);
+    final valueStyle = TextStyle(
+      color: valueColor,
+      fontSize: 12.5,
+      fontFamily: e.monospace ? 'monospace' : null,
+      height: 1.4,
+    );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              e.label,
+              style: TextStyle(color: labelColor, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: SelectableText(e.value, style: valueStyle),
+          ),
+          IconButton(
+            tooltip: '复制',
+            iconSize: 14,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 24,
+              minHeight: 24,
+            ),
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: e.value));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('已复制：${e.label}'),
+                  duration: const Duration(milliseconds: 800),
+                ),
+              );
+            },
+            icon: Icon(
+              Icons.copy_outlined,
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
