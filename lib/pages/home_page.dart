@@ -100,6 +100,13 @@ class _HomePageState extends ConsumerState<HomePage> {
         .toList();
   }
 
+  /// 更新搜索关键词，并把过滤后的列表同步给播放器，
+  /// 这样 next()/previous()/自动播放都使用当前可见的列表。
+  void _updateSearchQuery(String query) {
+    setState(() => _searchQuery = query);
+    ref.read(playerProvider.notifier).setPlaylist(_getFilteredSongs());
+  }
+
   /// 用专辑名搜索：把专辑名填充到搜索框并触发过滤
   void _searchByAlbum(String album) {
     if (album.isEmpty) return;
@@ -107,7 +114,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     _searchController.selection = TextSelection.fromPosition(
       TextPosition(offset: album.length),
     );
-    setState(() => _searchQuery = album);
+    _updateSearchQuery(album);
     // 滚回顶部，便于查看搜索结果
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
@@ -269,7 +276,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                             ? IconButton(
                                 onPressed: () {
                                   _searchController.clear();
-                                  setState(() => _searchQuery = '');
+                                  _updateSearchQuery('');
                                   // 清除搜索后失焦，恢复全局快捷键
                                   _searchFocusNode.unfocus();
                                 },
@@ -298,7 +305,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                       ),
                       onChanged: (value) {
-                        setState(() => _searchQuery = value);
+                        _updateSearchQuery(value);
                       },
                       // 回车后失焦，恢复全局快捷键
                       onSubmitted: (_) => _searchFocusNode.unfocus(),
@@ -382,7 +389,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           scrollToTarget(index);
         } else {
           _searchController.clear();
-          setState(() => _searchQuery = '');
+          _updateSearchQuery('');
           Future.delayed(
             const Duration(milliseconds: 100),
             () {

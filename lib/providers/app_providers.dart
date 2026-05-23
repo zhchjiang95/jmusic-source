@@ -396,8 +396,18 @@ class PlayerNotifier extends Notifier<PlayerState> {
   }
 
   /// 设置播放列表
+  ///
+  /// 同步更新当前歌曲在新列表中的索引：
+  /// - 当前歌曲仍在新列表中，更新 currentIndex 指向新位置；
+  /// - 当前歌曲不在新列表中，currentIndex 重置为 -1，
+  ///   下次 next()/previous() 会从列表头开始。
   void setPlaylist(List<Song> songs) {
-    state = state.copyWith(playlist: songs);
+    final cur = state.currentSong;
+    int newIndex = state.currentIndex;
+    if (cur != null) {
+      newIndex = songs.indexWhere((s) => s.filePath == cur.filePath);
+    }
+    state = state.copyWith(playlist: songs, currentIndex: newIndex);
   }
 
   /// 播放列表中指定位置的歌曲
