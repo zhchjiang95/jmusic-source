@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="zh-CN" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JMusic — 跨平台本地音乐播放器</title>
+    <meta
+      name="description"
+      content="JMusic 是一个使用 Flutter + Rust 构建的跨平台本地音乐播放器，支持在线歌词、专辑封面、桌面悬浮歌词与 macOS 菜单栏歌词。"
+    />
+    <meta name="theme-color" content="#0F0F23" />
+
+    <link rel="icon" type="image/png" href="assets/icon.png" />
+    <link rel="apple-touch-icon" href="assets/icon.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="JMusic — 跨平台本地音乐播放器" />
+    <meta
+      property="og:description"
+      content="Flutter + Rust 打造的极简本地音乐播放器，支持桌面悬浮歌词与 macOS 菜单栏歌词。"
+    />
+    <meta property="og:image" content="screenshots/player.png" />
+    <meta property="og:type" content="website" />
+
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: {
+                950: "#08081a",
+                900: "#0F0F23",
+                800: "#15152e",
+                700: "#1E1B4B",
+              },
+              brand: {
+                500: "#6366F1",
+                600: "#4F46E5",
+                700: "#4338CA",
+              },
+              accent: {
+                500: "#22C55E",
+                600: "#16A34A",
+              },
+            },
+            fontFamily: {
+              display: ["Righteous", "Outfit", "Noto Sans SC", "system-ui", "sans-serif"],
+              sans: ["Poppins", "Noto Sans SC", "system-ui", "sans-serif"],
+              mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+            },
+            boxShadow: {
+              glow: "0 0 60px -10px rgba(99,102,241,0.55)",
+              "glow-green": "0 0 50px -10px rgba(34,197,94,0.55)",
+            },
+            animation: {
+              "fade-up": "fadeUp .7s cubic-bezier(.21,.84,.34,1) both",
+              "float": "float 6s ease-in-out infinite",
+              "pulse-slow": "pulse 4s cubic-bezier(0.4,0,0.6,1) infinite",
+            },
+            keyframes: {
+              fadeUp: {
+                "0%": { opacity: 0, transform: "translateY(24px)" },
+                "100%": { opacity: 1, transform: "translateY(0)" },
+              },
+              float: {
+                "0%,100%": { transform: "translateY(0)" },
+                "50%": { transform: "translateY(-12px)" },
+              },
+            },
+          },
+        },
+      };
+    </script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Righteous&family=Poppins:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body class="bg-ink-900 text-slate-100 font-sans antialiased selection:bg-brand-600/40">
+    <!-- Aurora background -->
+    <div aria-hidden="true" class="aurora pointer-events-none fixed inset-0 -z-10"></div>
+
+    <!-- Floating Navbar -->
+    <header
+      id="nav"
+      class="fixed top-4 left-4 right-4 z-50 mx-auto max-w-6xl rounded-2xl border border-white/10 bg-ink-900/70 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.35)] transition-colors"
+    >
+      <nav class="flex items-center justify-between px-4 py-3 sm:px-5">
+        <a href="#top" class="flex items-center gap-2.5 cursor-pointer group">
+          <span
+            class="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-brand-500 shadow-glow ring-1 ring-white/10"
+          >
+            <!-- Music note icon -->
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="h-5 w-5 text-white"
+              aria-hidden="true"
+            >
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </span>
+          <span class="font-display text-xl tracking-wide text-white">JMusic</span>
+        </a>
+
+        <div class="hidden items-center gap-7 md:flex">
+          <a class="nav-link" href="#features">特性</a>
+          <a class="nav-link" href="#screenshots">截图</a>
+          <a class="nav-link" href="#tech">技术栈</a>
+          <a class="nav-link" href="#download">下载</a>
+          <a class="nav-link" href="#faq">FAQ</a>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <a
+            href="https://github.com/zhchjiang95/jmusic-source"
+            target="_blank"
+            rel="noopener"
+            class="hidden sm:inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 hover:bg-white/10 hover:text-white transition-colors duration-200 cursor-pointer"
+            aria-label="在 GitHub 上查看"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              class="h-4 w-4"
+              aria-hidden="true"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M12 2C6.477 2 2 6.486 2 12.02c0 4.428 2.865 8.184 6.839 9.51.5.094.682-.218.682-.483 0-.237-.009-.866-.013-1.7-2.782.605-3.369-1.342-3.369-1.342-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.004.07 1.532 1.032 1.532 1.032.892 1.53 2.341 1.087 2.91.831.092-.647.35-1.088.636-1.339-2.221-.253-4.555-1.113-4.555-4.951 0-1.094.39-1.989 1.029-2.69-.103-.253-.446-1.272.097-2.65 0 0 .84-.27 2.75 1.027a9.564 9.564 0 0 1 2.504-.337c.85.004 1.706.115 2.504.337 1.91-1.297 2.747-1.027 2.747-1.027.546 1.378.203 2.397.1 2.65.64.701 1.028 1.596 1.028 2.69 0 3.847-2.339 4.694-4.566 4.943.359.31.679.92.679 1.855 0 1.339-.012 2.419-.012 2.748 0 .268.18.58.688.481A10.024 10.024 0 0 0 22 12.02C22 6.486 17.523 2 12 2Z"
+                clip-rule="evenodd"
+              />
+            </svg>
+            <span>GitHub</span>
+          </a>
+          <a
+            href="#download"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3.5 py-1.5 text-sm font-medium text-ink-950 hover:bg-accent-600 shadow-glow-green transition-colors duration-200 cursor-pointer"
+          >
+            下载
+          </a>
+        </div>
+      </nav>
+    </header>
+
+    <!-- HERO -->
+    <section id="top" class="relative pt-36 pb-24 sm:pt-44 sm:pb-32">
+      <div class="mx-auto max-w-6xl px-5">
+        <div class="grid items-center gap-14 lg:grid-cols-12">
+          <div class="lg:col-span-6 reveal">
+            <span
+              class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300 backdrop-blur"
+            >
+              <span class="relative flex h-2 w-2">
+                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent-500/70"></span>
+                <span class="relative inline-flex h-2 w-2 rounded-full bg-accent-500"></span>
+              </span>
+              开源 · MIT License · Flutter + Rust
+            </span>
+
+            <h1 class="mt-5 font-display text-4xl leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
+              本地音乐播放，<br />
+              <span
+                class="bg-gradient-to-r from-brand-500 via-fuchsia-400 to-accent-500 bg-clip-text text-transparent"
+                >也能优雅</span
+              >
+            </h1>
+
+            <p class="mt-5 max-w-xl text-base text-slate-300 sm:text-lg">
+              JMusic 是一款使用 <strong class="text-white">Flutter + Rust</strong> 构建的跨平台本地音乐播放器，
+              支持在线歌词与专辑封面，提供桌面悬浮歌词、macOS 菜单栏歌词与沉浸式全屏歌词体验。
+            </p>
+
+            <div class="mt-8 flex flex-wrap items-center gap-3">
+              <a
+                href="https://github.com/zhchjiang95/jmusic-source/releases"
+                target="_blank"
+                rel="noopener"
+                class="group inline-flex items-center gap-2 rounded-xl bg-accent-500 px-5 py-3 font-medium text-ink-950 shadow-glow-green hover:bg-accent-600 transition-colors duration-200 cursor-pointer"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                下载最新版本
+              </a>
+
+              <a
+                href="https://github.com/zhchjiang95/jmusic-source"
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3 font-medium text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  class="h-5 w-5"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M12 2C6.477 2 2 6.486 2 12.02c0 4.428 2.865 8.184 6.839 9.51.5.094.682-.218.682-.483 0-.237-.009-.866-.013-1.7-2.782.605-3.369-1.342-3.369-1.342-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.004.07 1.532 1.032 1.532 1.032.892 1.53 2.341 1.087 2.91.831.092-.647.35-1.088.636-1.339-2.221-.253-4.555-1.113-4.555-4.951 0-1.094.39-1.989 1.029-2.69-.103-.253-.446-1.272.097-2.65 0 0 .84-.27 2.75 1.027a9.564 9.564 0 0 1 2.504-.337c.85.004 1.706.115 2.504.337 1.91-1.297 2.747-1.027 2.747-1.027.546 1.378.203 2.397.1 2.65.64.701 1.028 1.596 1.028 2.69 0 3.847-2.339 4.694-4.566 4.943.359.31.679.92.679 1.855 0 1.339-.012 2.419-.012 2.748 0 .268.18.58.688.481A10.024 10.024 0 0 0 22 12.02C22 6.486 17.523 2 12 2Z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                在 GitHub 查看
+              </a>
+            </div>
+
+            <!-- Platform pills -->
+            <div class="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3 text-sm text-slate-400">
+              <span class="inline-flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 text-slate-300" aria-hidden="true">
+                  <path
+                    d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.252-1.68.03.13.046.28.046.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z"
+                  />
+                </svg>
+                macOS (Apple Silicon)
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 text-slate-300" aria-hidden="true">
+                  <path d="M3 5.5L11 4v8H3V5.5zM12 4l9-1.5V12h-9V4zM3 13h8v7.5L3 19v-6zM12 13h9v8.5L12 20v-7z" />
+                </svg>
+                Windows
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 text-slate-300" aria-hidden="true">
+                  <path
+                    d="M12 2c-2.5 0-4 2-4 4 0 1.5.5 2 .5 3 0 1.2-1.5 2.5-2.5 3.5C4 14.5 3 16 3 18c0 1.5 1 3 3 3 1.5 0 2-1 4-1s2.5 1 4 1c2 0 3-1.5 3-3 0-2-1-3.5-3-5.5-1-1-2.5-2.3-2.5-3.5 0-1 .5-1.5.5-3 0-2-1.5-4-4-4z"
+                  />
+                </svg>
+                Linux
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 text-slate-300" aria-hidden="true">
+                  <path
+                    d="M6 9h12v9a2 2 0 0 1-2 2h-1v3h-2v-3h-2v3H9v-3H8a2 2 0 0 1-2-2V9zM4 9a1.5 1.5 0 1 1 3 0v6a1.5 1.5 0 1 1-3 0V9zm13 0a1.5 1.5 0 1 1 3 0v6a1.5 1.5 0 1 1-3 0V9zM7.5 8c0-2.5 2-4.5 4.5-4.5S16.5 5.5 16.5 8h-9zm1.5-3l-.7-1.2.9-.5.7 1.2zM15 5l-.9-.5.7-1.2.9.5z"
+                  />
+                </svg>
+                Android
+              </span>
+            </div>
+          </div>
+
+          <!-- Hero artwork -->
+          <div class="lg:col-span-6 reveal" data-delay="120">
+            <div class="relative">
+              <div
+                aria-hidden="true"
+                class="absolute -inset-8 rounded-[2rem] bg-gradient-to-br from-brand-600/40 via-fuchsia-500/20 to-accent-500/30 blur-3xl"
+              ></div>
+              <div
+                class="relative overflow-hidden rounded-3xl border border-white/10 bg-ink-800/60 shadow-glow ring-1 ring-white/5 animate-float"
+              >
+                <img
+                  src="screenshots/player.png"
+                  alt="JMusic 播放页面截图"
+                  loading="eager"
+                  class="block w-full h-auto"
+                />
+              </div>
+              <!-- Mini badge -->
+              <div
+                class="absolute -bottom-5 -left-5 hidden items-center gap-3 rounded-2xl border border-white/10 bg-ink-900/80 px-4 py-3 backdrop-blur-xl sm:flex"
+              >
+                <span class="grid h-9 w-9 place-items-center rounded-full bg-accent-500 text-ink-950">
+                  <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" aria-hidden="true">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+                <div>
+                  <p class="text-sm font-medium text-white">正在播放</p>
+                  <p class="text-xs text-slate-400">本地音乐 · 离线优先</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FEATURES -->
+    <section id="features" class="relative py-20 sm:py-28">
+      <div class="mx-auto max-w-6xl px-5">
+        <div class="mb-14 max-w-2xl reveal">
+          <p class="font-mono text-xs uppercase tracking-[0.2em] text-brand-500">Features</p>
+          <h2 class="mt-3 font-display text-3xl text-white sm:text-4xl">为听本地音乐而生</h2>
+          <p class="mt-3 text-slate-300">
+            从扫描你的本地音乐目录开始，到歌词同步、桌面悬浮、菜单栏歌词，所有体验都被仔细打磨。
+          </p>
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <!-- Card 1 -->
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="h-6 w-6"
+                aria-hidden="true"
+              >
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+            <h3 class="feature-title">本地音乐播放</h3>
+            <p class="feature-desc">支持 MP3 / FLAC / WAV / OGG 等主流音频格式，基于 Rust + rodio 高效解码。</p>
+          </article>
+
+          <!-- Card 2 -->
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="h-6 w-6"
+                aria-hidden="true"
+              >
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              </svg>
+            </div>
+            <h3 class="feature-title">目录扫描与歌曲库</h3>
+            <p class="feature-desc">选择音乐文件夹自动扫描，建立可搜索的本地歌曲库，元数据持久化到本地 JSON。</p>
+          </article>
+
+          <!-- Card 3 -->
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="h-6 w-6"
+                aria-hidden="true"
+              >
+                <path d="M14 4h7v7" />
+                <path d="M21 4 11 14" />
+                <path d="M4 8v12h12" />
+              </svg>
+            </div>
+            <h3 class="feature-title">沉浸式全屏歌词</h3>
+            <p class="feature-desc">逐行高亮、平滑居中滚动，长歌词自动换行左对齐，专为认真听一首歌而设计。</p>
+          </article>
+
+          <!-- Card 4 -->
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="h-6 w-6"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="14" rx="2" />
+                <path d="M3 10h18" />
+                <path d="M8 18v3" />
+                <path d="M16 18v3" />
+                <path d="M7 21h10" />
+              </svg>
+            </div>
+            <h3 class="feature-title">桌面悬浮歌词 (Windows)</h3>
+            <p class="feature-desc">透明置顶窗口实时显示当前 + 下一行歌词，可拖拽定位、调字号、鼠标穿透锁定。</p>
+          </article>
+
+          <!-- Card 5 -->
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="h-6 w-6"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="18" height="6" rx="2" />
+                <path d="M7 6h10" />
+                <path d="M7 13h10" />
+                <path d="M7 17h6" />
+              </svg>
+            </div>
+            <h3 class="feature-title">菜单栏歌词 (macOS)</h3>
+            <p class="feature-desc">系统状态栏实时显示歌词，支持播放控制、上一/下一首，关闭主窗口仅隐藏后台保活。</p>
+          </article>
+
+          <!-- Card 6 -->
+          <article class="feature-card reveal">
+            <div class="feature-icon">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="h-6 w-6"
+                aria-hidden="true"
+              >
+                <path d="M17 1l4 4-4 4" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                <path d="M7 23l-4-4 4-4" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+            </div>
+            <h3 class="feature-title">三种播放模式</h3>
+            <p class="feature-desc">顺序播放、单曲循环、随机播放，一键切换，状态持久化下次启动自动恢复。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREENSHOTS -->
+    <section id="screenshots" class="relative py-20 sm:py-28">
+      <div class="mx-auto max-w-6xl px-5">
+        <div class="mb-14 max-w-2xl reveal">
+          <p class="font-mono text-xs uppercase tracking-[0.2em] text-brand-500">Screenshots</p>
+          <h2 class="mt-3 font-display text-3xl text-white sm:text-4xl">看一看真实界面</h2>
+          <p class="mt-3 text-slate-300">深色 Material 3 主题，专注内容，去除一切干扰。</p>
+        </div>
+
+        <div class="grid gap-6 lg:grid-cols-2">
+          <figure class="shot-card reveal">
+            <img src="screenshots/home.png" alt="JMusic 主页 / 歌曲库截图" loading="lazy" />
+            <figcaption>主页 · 歌曲库</figcaption>
+          </figure>
+          <figure class="shot-card reveal" data-delay="80">
+            <img src="screenshots/player.png" alt="JMusic 播放页 / 歌词截图" loading="lazy" />
+            <figcaption>播放页 · 歌词</figcaption>
+          </figure>
+          <figure class="shot-card reveal" data-delay="160">
+            <img src="screenshots/fullscreen-lyrics.png" alt="JMusic 全屏歌词截图" loading="lazy" />
+            <figcaption>全屏歌词</figcaption>
+          </figure>
+          <figure class="shot-card reveal" data-delay="240">
+            <img src="screenshots/desktop-lyrics.png" alt="JMusic 桌面悬浮歌词 (Windows) 截图" loading="lazy" />
+            <figcaption>桌面悬浮歌词 (Windows)</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- TECH STACK -->
+    <section id="tech" class="relative py-20 sm:py-28">
+      <div class="mx-auto max-w-6xl px-5">
+        <div class="mb-14 max-w-2xl reveal">
+          <p class="font-mono text-xs uppercase tracking-[0.2em] text-brand-500">Architecture</p>
+          <h2 class="mt-3 font-display text-3xl text-white sm:text-4xl">Flutter 写界面，Rust 写引擎</h2>
+          <p class="mt-3 text-slate-300">UI 层享受 Flutter 的跨平台与流畅，核心层享受 Rust 的性能与安全。</p>
+        </div>
+
+        <div class="grid gap-5 lg:grid-cols-3">
+          <div class="layer-card reveal">
+            <p class="layer-tag">UI 层</p>
+            <h3 class="layer-title">Flutter + Riverpod</h3>
+            <p class="layer-desc">Material 3 深色主题，Riverpod 管理全局状态，跨平台一份代码。</p>
+            <ul class="layer-list">
+              <li>页面：HomePage / PlayerPage</li>
+              <li>组件：MiniPlayer / LyricsView</li>
+              <li>状态：app_providers</li>
+            </ul>
+          </div>
+
+          <div class="layer-card reveal" data-delay="80">
+            <p class="layer-tag">桥接层</p>
+            <h3 class="layer-title">flutter_rust_bridge</h3>
+            <p class="layer-desc">Dart ↔ Rust FFI，安全的零样板代码绑定，类型自动同步。</p>
+            <ul class="layer-list">
+              <li>player API</li>
+              <li>scanner API</li>
+              <li>metadata API</li>
+            </ul>
+          </div>
+
+          <div class="layer-card reveal" data-delay="160">
+            <p class="layer-tag">核心层</p>
+            <h3 class="layer-title">Rust</h3>
+            <p class="layer-desc">音频解码、文件扫描、网络请求、本地持久化全部交给 Rust。</p>
+            <ul class="layer-list">
+              <li>audio · rodio 播放引擎</li>
+              <li>network · reqwest 客户端</li>
+              <li>storage · 本地 JSON</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD -->
+    <section id="download" class="relative py-20 sm:py-28">
+      <div class="mx-auto max-w-6xl px-5">
+        <div
+          class="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-ink-700/80 via-ink-800/80 to-ink-900/80 p-8 sm:p-12 reveal"
+        >
+          <div
+            aria-hidden="true"
+            class="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-brand-600/30 blur-3xl"
+          ></div>
+
+          <div class="grid gap-10 lg:grid-cols-2 lg:items-center">
+            <div>
+              <p class="font-mono text-xs uppercase tracking-[0.2em] text-accent-500">Download</p>
+              <h2 class="mt-3 font-display text-3xl text-white sm:text-4xl">现在就开始听</h2>
+              <p class="mt-3 text-slate-300">从 GitHub Releases 选择对应平台的安装包，免费且开源。</p>
+
+              <div class="mt-8 flex flex-wrap gap-3">
+                <a
+                  href="https://github.com/zhchjiang95/jmusic-source/releases"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex items-center gap-2 rounded-xl bg-accent-500 px-5 py-3 font-medium text-ink-950 shadow-glow-green hover:bg-accent-600 transition-colors duration-200 cursor-pointer"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="h-5 w-5"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  前往 Releases
+                </a>
+                <a
+                  href="https://github.com/zhchjiang95/jmusic-source"
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3 font-medium text-white hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                >
+                  源代码
+                </a>
+              </div>
+
+              <!-- Platform availability -->
+              <ul class="mt-8 grid gap-2 text-sm text-slate-300 sm:grid-cols-2">
+                <li class="flex items-center gap-2">
+                  <span class="h-1.5 w-1.5 rounded-full bg-accent-500"></span>
+                  macOS · Apple Silicon (M1/M2/M3)
+                </li>
+                <li class="flex items-center gap-2">
+                  <span class="h-1.5 w-1.5 rounded-full bg-accent-500"></span>
+                  Windows · 桌面悬浮歌词
+                </li>
+                <li class="flex items-center gap-2">
+                  <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+                  Linux · 自行构建
+                </li>
+                <li class="flex items-center gap-2">
+                  <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+                  Android · APK / AAB
+                </li>
+              </ul>
+            </div>
+
+            <!-- macOS install snippet -->
+            <div class="rounded-2xl border border-white/10 bg-ink-950/60 p-5">
+              <div class="mb-3 flex items-center justify-between">
+                <p class="text-sm font-medium text-white">macOS · 解除“应用已损坏”提示</p>
+                <span
+                  class="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-slate-300"
+                  >Apple Silicon</span
+                >
+              </div>
+              <p class="text-sm text-slate-400">
+                未签名公证版本首次打开会被 macOS 拦截。打开终端执行：
+              </p>
+              <div class="mt-3 group relative">
+                <pre
+                  class="overflow-x-auto rounded-xl bg-black/60 p-4 font-mono text-sm text-slate-100 ring-1 ring-white/5"
+                ><code id="xattr-cmd">xattr -cr /你的解压路径/JMusic.app</code></pre>
+                <button
+                  type="button"
+                  data-copy-target="xattr-cmd"
+                  class="absolute right-2 top-2 inline-flex items-center gap-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-200 hover:bg-white/10 transition-colors duration-200 cursor-pointer"
+                  aria-label="复制命令"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="h-3.5 w-3.5"
+                    aria-hidden="true"
+                  >
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                  <span class="copy-label">复制</span>
+                </button>
+              </div>
+              <p class="mt-3 text-xs text-slate-500">
+                小提示：先输入 <code class="font-mono text-slate-300">xattr -cr </code>（结尾留一个空格），
+                再把 .app 拖入终端窗口，回车即可。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="relative py-20 sm:py-28">
+      <div class="mx-auto max-w-3xl px-5">
+        <div class="mb-12 reveal">
+          <p class="font-mono text-xs uppercase tracking-[0.2em] text-brand-500">FAQ</p>
+          <h2 class="mt-3 font-display text-3xl text-white sm:text-4xl">常见问题</h2>
+        </div>
+
+        <div class="space-y-3">
+          <details class="faq-item reveal">
+            <summary>
+              <span>当前 macOS 版本是否兼容 Intel 芯片？</span>
+              <svg class="faq-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p>
+              当前发布版本仅支持 Apple Silicon (M1/M2/M3 等 M 系列芯片)。Intel 芯片用户可通过源代码自行构建：
+              <code class="font-mono text-slate-200">flutter build macos</code>。
+            </p>
+          </details>
+
+          <details class="faq-item reveal" data-delay="50">
+            <summary>
+              <span>启动时提示“应用已损坏”或“无法验证开发者”怎么办？</span>
+              <svg class="faq-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p>
+              这是 macOS Gatekeeper 对未签名应用的默认拦截。在终端中执行
+              <code class="font-mono text-slate-200">xattr -cr /路径/JMusic.app</code>
+              清理隔离属性后即可正常启动。
+            </p>
+          </details>
+
+          <details class="faq-item reveal" data-delay="100">
+            <summary>
+              <span>在线歌词、专辑封面无法获取怎么办？</span>
+              <svg class="faq-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p>
+              在线匹配依赖第三方接口，可能因接口变动而失效。此时可使用应用内的手动编辑功能，导入 LRC
+              歌词或封面文件，元数据会写入到源文件保留。
+            </p>
+          </details>
+
+          <details class="faq-item reveal" data-delay="150">
+            <summary>
+              <span>JMusic 会上传我的音乐数据吗？</span>
+              <svg class="faq-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p>
+              不会。JMusic 离线优先，所有歌曲库元数据保存在本地 JSON。仅在你触发匹配/搜索时，
+              才会向音乐元数据接口发起请求，无任何遥测或账户系统。
+            </p>
+          </details>
+
+          <details class="faq-item reveal" data-delay="200">
+            <summary>
+              <span>支持哪些音频格式？</span>
+              <svg class="faq-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p>支持 MP3、FLAC、WAV、OGG 等主流格式，由 Rust 端 rodio 引擎进行解码与播放。</p>
+          </details>
+
+          <details class="faq-item reveal" data-delay="250">
+            <summary>
+              <span>能不能贡献代码或反馈 Bug？</span>
+              <svg class="faq-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </summary>
+            <p>
+              当然欢迎！项目以 MIT 协议开源。可以在
+              <a
+                href="https://github.com/zhchjiang95/jmusic-source/issues"
+                target="_blank"
+                rel="noopener"
+                class="text-brand-500 hover:text-brand-600 underline underline-offset-2"
+                >GitHub Issues</a
+              >
+              提交 Bug、想法或 Pull Request。
+            </p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="border-t border-white/5 py-10">
+      <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 sm:flex-row">
+        <div class="flex items-center gap-2 text-sm text-slate-400">
+          <span
+            class="grid h-7 w-7 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-brand-500 ring-1 ring-white/10"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-white" aria-hidden="true">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </span>
+          <span class="font-display tracking-wide text-white">JMusic</span>
+          <span class="text-slate-500">· MIT License</span>
+        </div>
+
+        <div class="flex items-center gap-5 text-sm text-slate-400">
+          <a class="footer-link" href="https://github.com/zhchjiang95/jmusic-source" target="_blank" rel="noopener">GitHub</a>
+          <a class="footer-link" href="https://github.com/zhchjiang95/jmusic-source/releases" target="_blank" rel="noopener">Releases</a>
+          <a class="footer-link" href="https://github.com/zhchjiang95/jmusic-source/issues" target="_blank" rel="noopener">Issues</a>
+        </div>
+      </div>
+    </footer>
+
+    <script src="script.js" defer></script>
+  </body>
+</html>

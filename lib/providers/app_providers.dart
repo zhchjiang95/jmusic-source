@@ -346,11 +346,23 @@ class PlayerNotifier extends Notifier<PlayerState> {
     });
   }
 
+  /// 构造无歌词时的默认显示文本：歌曲名 - 歌手
+  String _defaultOverlayText([Song? song]) {
+    final s = song ?? state.currentSong;
+    if (s == null) return 'JMusic - 本地音乐播放器';
+    final title = s.title.trim();
+    final artist = s.artist.trim();
+    if (title.isEmpty && artist.isEmpty) return 'JMusic - 本地音乐播放器';
+    if (artist.isEmpty) return title;
+    if (title.isEmpty) return artist;
+    return '$title - $artist';
+  }
+
   /// 更新桌面悬浮歌词显示内容
   void _updateOverlayLyrics(int currentMs) {
     final lyrics = state.lyrics;
     if (lyrics == null || lyrics.lines.isEmpty) {
-      NativeUtils.updateLyricsOverlay('JMusic - 本地音乐播放器', '');
+      NativeUtils.updateLyricsOverlay(_defaultOverlayText(), '');
       return;
     }
 
@@ -375,7 +387,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
     // 如果当前行和下一行都为空（可能歌词还没开始），显示默认文本
     if (currentLine.isEmpty && nextLine.isEmpty) {
-      NativeUtils.updateLyricsOverlay('JMusic - 本地音乐播放器', '');
+      NativeUtils.updateLyricsOverlay(_defaultOverlayText(), '');
       return;
     }
 
@@ -428,7 +440,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
     );
 
     // 切歌时显示默认文本
-    NativeUtils.updateLyricsOverlay('JMusic - 本地音乐播放器', '');
+    NativeUtils.updateLyricsOverlay(_defaultOverlayText(song), '');
 
     try {
       if (Platform.isAndroid) {
