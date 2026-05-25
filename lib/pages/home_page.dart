@@ -46,6 +46,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// 全局键盘事件处理。返回 true 表示已处理（阻止继续传播）。
   bool _handleHardwareKey(KeyEvent event) {
     if (event is! KeyDownEvent) return false;
+    if (!mounted) return false;
+    // 当前路由不在最前（比如跳到了 PlayerPage / 全屏歌词页）时不处理，
+    // 避免与上层页面的 CallbackShortcuts 重复触发，导致快捷键互相抵消。
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute != null && !modalRoute.isCurrent) return false;
     // 搜索框聚焦时（或任何可编辑文本聚焦时）不拦截，避免影响输入
     if (_searchFocusNode.hasFocus) return false;
     final focused = FocusManager.instance.primaryFocus;
