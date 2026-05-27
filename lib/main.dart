@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:jmusic/src/rust/frb_generated.dart';
 import 'package:jmusic/src/rust/api/simple.dart' as rust_simple;
 import 'package:jmusic/pages/home_page.dart';
+import 'package:jmusic/providers/dynamic_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,30 +32,18 @@ Future<void> main() async {
   runApp(const ProviderScope(child: JMusicApp()));
 }
 
-class JMusicApp extends StatelessWidget {
+class JMusicApp extends ConsumerWidget {
   const JMusicApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dynamicTheme = ref.watch(dynamicThemeProvider);
+    final scheme = dynamicTheme.colorScheme ?? defaultDarkScheme();
+
     return MaterialApp(
       title: 'JMusic',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6750A4),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        fontFamily: 'System',
-        // 深色主题背景
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        cardTheme: const CardThemeData(color: Color(0xFF1E1E2E), elevation: 0),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-      ),
+      theme: buildTheme(scheme),
       home: const HomePage(),
     );
   }
