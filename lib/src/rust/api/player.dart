@@ -41,3 +41,7 @@ bool playerIsFinished() =>
 /// 获取当前播放文件路径
 String? playerGetCurrentFile() =>
     RustLib.instance.api.crateApiPlayerPlayerGetCurrentFile();
+
+/// 获取最新的 64-bin 频谱帧（归一化 0.0~1.0），无帧时返回 None
+Float32List? playerGetSpectrum() =>
+    RustLib.instance.api.crateApiPlayerPlayerGetSpectrum();

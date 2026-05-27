@@ -33,6 +33,11 @@ walkdir = "2"
 log = "0.4"
 env_logger = "0.11"
 
+# 频谱分析（FFT + 无锁缓存）
+realfft = "3"
+arc-swap = "1"
+parking_lot = "0.12"
+
 # 系统媒体控制（SMTC / Now Playing / MPRIS）— 仅桌面平台
 [target.'cfg(not(target_os = "android"))'.dependencies]
 souvlaki = "0.8"

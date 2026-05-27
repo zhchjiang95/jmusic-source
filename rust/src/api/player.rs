@@ -90,3 +90,10 @@ pub fn player_is_finished() -> bool {
 pub fn player_get_current_file() -> Option<String> {
     CURRENT_FILE.lock().unwrap().clone()
 }
+
+/// 获取最新的 64-bin 频谱帧（归一化 0.0~1.0），无帧时返回 None
+#[flutter_rust_bridge::frb(sync)]
+pub fn player_get_spectrum() -> Option<Vec<f32>> {
+    let guard = AUDIO_ENGINE.lock().unwrap();
+    guard.as_ref().and_then(|e| e.analyzer().snapshot())
+}

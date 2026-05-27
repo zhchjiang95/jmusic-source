@@ -1,4 +1,5 @@
 use std::fs::File;
+use std::sync::Arc;
 use std::time::Duration;
 
 use rodio::Source;
@@ -9,6 +10,8 @@ use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::probe::Hint;
 use symphonia::core::units::Time;
+
+use super::spectrum::SpectrumAnalyzer;
 
 /// 基于 symphonia 的可 seek 音频源，支持所有格式的高效跳转
 pub struct SeekableSource {
@@ -21,6 +24,8 @@ pub struct SeekableSource {
     samples: Vec<i16>,
     /// 当前读取位置
     pos: usize,
+    /// 频谱分析器（可选，音频线程通过此推送 PCM）
+    analyzer: Option<Arc<SpectrumAnalyzer>>,
 }
 
 impl SeekableSource {
@@ -63,7 +68,23 @@ impl SeekableSource {
             channels,
             samples: Vec::new(),
             pos: 0,
+            analyzer: None,
         })
+    }
+
+    /// 附加频谱分析器（在播放前调用）
+    pub fn with_analyzer(mut self, a: Arc<SpectrumAnalyzer>) -> Self {
+        a.set_sample_rate(self.sample_rate);
+        self.analyzer = Some(a);
+        self
+    }
+
+    /// 将解码后的样本推送给频谱分析器（零分配）
+    #[inline]
+    fn flush_to_analyzer(&self, samples: &[i16]) {
+        if let Some(ref a) = self.analyzer {
+            a.push_interleaved_i16(samples, self.channels);
+        }
     }
 
     /// 跳转到指定秒数（容器级高效 seek）
@@ -107,6 +128,7 @@ impl SeekableSource {
                     let num_samples = decoded.capacity();
                     let mut buf = SampleBuffer::<i16>::new(num_samples as u64, spec);
                     buf.copy_interleaved_ref(decoded);
+                    self.flush_to_analyzer(buf.samples());
                     self.samples = buf.samples().to_vec();
                     self.pos = 0;
                     return true;

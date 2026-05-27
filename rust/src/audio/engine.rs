@@ -1,8 +1,11 @@
 use rodio::{OutputStream, Sink};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread;
 
 use super::source::SeekableSource;
+use super::spectrum::{spawn_worker, SpectrumAnalyzer};
 
 /// 音频引擎命令
 enum AudioCommand {
@@ -29,6 +32,9 @@ enum AudioCommand {
 /// 音频播放引擎（通过命令通道与音频线程通信）
 pub struct AudioEngine {
     cmd_tx: mpsc::Sender<AudioCommand>,
+    analyzer: Arc<SpectrumAnalyzer>,
+    shutdown: Arc<AtomicBool>,
+    _worker: Option<thread::JoinHandle<()>>,
 }
 
 impl AudioEngine {
@@ -36,6 +42,12 @@ impl AudioEngine {
     /// 在单独的线程中运行音频输出（因为 OutputStream 不是 Send）
     pub fn new() -> Result<Self, String> {
         let (cmd_tx, cmd_rx) = mpsc::channel::<AudioCommand>();
+
+        // 创建频谱分析器和 worker 线程
+        let analyzer = SpectrumAnalyzer::new();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker = spawn_worker(analyzer.clone(), shutdown.clone());
+        let analyzer_for_thread = analyzer.clone();
 
         // 启动音频专用线程
         thread::spawn(move || {
@@ -51,13 +63,15 @@ impl AudioEngine {
             let mut sink: Option<Sink> = None;
             let mut current_file: Option<String> = None;
             let _stream = stream; // 保持存活
+            let analyzer = analyzer_for_thread;
 
             // 处理命令循环
             while let Ok(cmd) = cmd_rx.recv() {
                 match cmd {
                     AudioCommand::Play(file_path, reply) => {
                         let result = (|| -> Result<(), String> {
-                            let source = SeekableSource::new(&file_path)?;
+                            let source = SeekableSource::new(&file_path)?
+                                .with_analyzer(analyzer.clone());
 
                             // 停止当前播放
                             if let Some(s) = sink.take() {
@@ -70,6 +84,7 @@ impl AudioEngine {
                             new_sink.append(source);
                             current_file = Some(file_path);
                             sink = Some(new_sink);
+                            analyzer.set_paused(false);
                             Ok(())
                         })();
                         let _ = reply.send(result);
@@ -78,17 +93,21 @@ impl AudioEngine {
                         if let Some(s) = &sink {
                             s.pause();
                         }
+                        analyzer.set_paused(true);
                     }
                     AudioCommand::Resume => {
                         if let Some(s) = &sink {
                             s.play();
                         }
+                        analyzer.set_paused(false);
                     }
                     AudioCommand::Stop => {
                         if let Some(s) = sink.take() {
                             s.stop();
                         }
                         current_file = None;
+                        analyzer.set_paused(true);
+                        analyzer.clear_frame();
                     }
                     AudioCommand::SetVolume(vol) => {
                         if let Some(s) = &sink {
@@ -116,6 +135,7 @@ impl AudioEngine {
                             // 重新打开文件，用 symphonia 直接 seek（容器级高效跳转）
                             let mut source = SeekableSource::new(&file_path)?;
                             source.seek(pos)?;
+                            let source = source.with_analyzer(analyzer.clone());
 
                             // 创建新 Sink 从 seek 位置播放
                             let new_sink = Sink::try_new(&stream_handle)
@@ -146,7 +166,17 @@ impl AudioEngine {
             }
         });
 
-        Ok(Self { cmd_tx })
+        Ok(Self {
+            cmd_tx,
+            analyzer,
+            shutdown,
+            _worker: Some(worker),
+        })
+    }
+
+    /// 获取频谱分析器引用
+    pub fn analyzer(&self) -> &Arc<SpectrumAnalyzer> {
+        &self.analyzer
     }
 
     /// 播放指定文件
@@ -211,5 +241,10 @@ impl AudioEngine {
 impl Drop for AudioEngine {
     fn drop(&mut self) {
         let _ = self.cmd_tx.send(AudioCommand::Shutdown);
+        self.shutdown.store(true, Ordering::Release);
+        // Best-effort join the worker thread
+        if let Some(handle) = self._worker.take() {
+            let _ = handle.join();
+        }
     }
 }

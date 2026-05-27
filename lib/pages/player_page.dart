@@ -1,10 +1,13 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/providers/spectrum.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
+import 'package:jmusic/widgets/spectrum_view.dart';
 
 /// 全屏播放页面
 class PlayerPage extends ConsumerWidget {
@@ -60,6 +63,52 @@ class PlayerPage extends ConsumerWidget {
                   // 歌曲信息
                   _buildSongInfo(currentSong, theme),
                   const SizedBox(height: 12),
+
+                  // 频谱可视化（仅桌面端）
+                  if (!Platform.isAndroid)
+                    SizedBox(
+                      height: 60,
+                      child: Stack(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32),
+                            child: Consumer(
+                              builder: (context, ref, _) {
+                                final spec = ref.watch(
+                                    playerProvider.select((s) => s.spectrum));
+                                final style = ref.watch(playerProvider
+                                    .select((s) => s.spectrumStyle));
+                                return SpectrumView(
+                                    style: style, spectrum: spec);
+                              },
+                            ),
+                          ),
+                          Positioned(
+                            right: 8,
+                            top: 4,
+                            child: Consumer(
+                              builder: (context, ref, _) {
+                                final style = ref.watch(playerProvider
+                                    .select((s) => s.spectrumStyle));
+                                return IconButton(
+                                  tooltip: '切换可视化样式',
+                                  iconSize: 18,
+                                  icon: Icon(
+                                    style == SpectrumStyle.bars
+                                        ? Icons.graphic_eq
+                                        : Icons.album,
+                                    color: Colors.white54,
+                                  ),
+                                  onPressed: () => ref
+                                      .read(playerProvider.notifier)
+                                      .toggleSpectrumStyle(),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // 歌词预览（两行）
                   _buildLyricsPreview(theme),
@@ -516,7 +565,38 @@ class _FullScreenLyricsPage extends ConsumerWidget {
               ),
             ),
             child: SafeArea(
-              child: Column(
+              child: Stack(
+                children: [
+                  // 频谱背景（仅桌面端，低不透明度 + 径向遮罩）
+                  if (!Platform.isAndroid)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: ShaderMask(
+                          blendMode: BlendMode.dstIn,
+                          shaderCallback: (rect) => const RadialGradient(
+                            center: Alignment.center,
+                            radius: 0.9,
+                            colors: [Colors.white, Colors.transparent],
+                            stops: [0.55, 1.0],
+                          ).createShader(rect),
+                          child: Consumer(
+                            builder: (context, ref, _) {
+                              final spec = ref.watch(
+                                  playerProvider.select((s) => s.spectrum));
+                              final style = ref.watch(playerProvider
+                                  .select((s) => s.spectrumStyle));
+                              return SpectrumView(
+                                style: style,
+                                spectrum: spec,
+                                opacity: 0.25,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  // 主内容
+                  Column(
                 children: [
                   // 顶部栏
                   Padding(
@@ -612,6 +692,8 @@ class _FullScreenLyricsPage extends ConsumerWidget {
                       ],
                     ),
                   ),
+                ],
+              ),
                 ],
               ),
             ),

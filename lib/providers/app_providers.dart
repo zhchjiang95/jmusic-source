@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jmusic/providers/spectrum.dart';
 import 'package:jmusic/src/rust/api/player.dart' as rust_player;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
@@ -11,6 +12,7 @@ import 'package:jmusic/src/rust/api/play_stats.dart' as rust_play_stats;
 import 'package:jmusic/src/rust/api/media_session.dart' as rust_media_session;
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// 播放模式枚举
 enum PlayMode {
@@ -39,6 +41,8 @@ class PlayerState {
   final List<int>? coverData;
   final bool isLoading;
   final String? error; // 播放错误信息
+  final List<double> spectrum; // 64-bin 频谱数据 (0.0~1.0)
+  final SpectrumStyle spectrumStyle; // 频谱可视化样式
 
   const PlayerState({
     this.currentSong,
@@ -54,6 +58,8 @@ class PlayerState {
     this.coverData,
     this.isLoading = false,
     this.error,
+    this.spectrum = const [],
+    this.spectrumStyle = SpectrumStyle.bars,
   });
 
   PlayerState copyWith({
@@ -70,6 +76,8 @@ class PlayerState {
     List<int>? coverData,
     bool? isLoading,
     String? error,
+    List<double>? spectrum,
+    SpectrumStyle? spectrumStyle,
     bool clearLyrics = false,
     bool clearCover = false,
     bool clearSong = false,
@@ -89,6 +97,8 @@ class PlayerState {
       coverData: clearCover ? null : (coverData ?? this.coverData),
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+      spectrum: spectrum ?? this.spectrum,
+      spectrumStyle: spectrumStyle ?? this.spectrumStyle,
     );
   }
 }
@@ -96,6 +106,7 @@ class PlayerState {
 /// 播放器状态管理（Riverpod 3.x Notifier）
 class PlayerNotifier extends Notifier<PlayerState> {
   Timer? _positionTimer;
+  Timer? _spectrumTimer;
   Timer? _mediaEventTimer;
   bool _isSeeking = false;
 
@@ -109,9 +120,12 @@ class PlayerNotifier extends Notifier<PlayerState> {
     NativeUtils.updateTitle('JMusic');
     // 注册托盘播放控制回调
     _registerTrayHandler();
+    // 恢复频谱样式偏好
+    _restoreSpectrumStyle();
     // 清理定时器
     ref.onDispose(() {
       _positionTimer?.cancel();
+      _spectrumTimer?.cancel();
       _mediaEventTimer?.cancel();
       try {
         if (!Platform.isAndroid) {
@@ -120,6 +134,58 @@ class PlayerNotifier extends Notifier<PlayerState> {
       } catch (_) {}
     });
     return const PlayerState();
+  }
+
+  /// 恢复频谱可视化样式偏好
+  void _restoreSpectrumStyle() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final style =
+          SpectrumStyleX.fromPref(prefs.getString(kSpectrumStylePrefKey));
+      state = state.copyWith(spectrumStyle: style);
+    } catch (_) {
+      // 默认 bars
+    }
+  }
+
+  /// 启动频谱轮询定时器
+  void _startSpectrumTimer() {
+    if (Platform.isAndroid) return; // Android v1 不支持
+    _spectrumTimer?.cancel();
+    _spectrumTimer = Timer.periodic(kSpectrumPollInterval, (_) {
+      if (!state.isPlaying) return;
+      try {
+        final frame = rust_player.playerGetSpectrum();
+        if (frame == null) return;
+        // 防御性归一化
+        final List<double> safe;
+        if (frame.length == kSpectrumBins) {
+          safe = List<double>.generate(
+              kSpectrumBins, (i) => frame[i].clamp(0.0, 1.0));
+        } else {
+          safe = List<double>.generate(kSpectrumBins,
+              (i) => i < frame.length ? frame[i].toDouble().clamp(0.0, 1.0) : 0.0);
+        }
+        state = state.copyWith(spectrum: safe);
+      } catch (_) {}
+    });
+  }
+
+  /// 停止频谱轮询定时器
+  void _stopSpectrumTimer() {
+    _spectrumTimer?.cancel();
+    _spectrumTimer = null;
+    state = state.copyWith(spectrum: emptySpectrum());
+  }
+
+  /// 切换频谱可视化样式
+  void toggleSpectrumStyle() async {
+    final next = state.spectrumStyle.next();
+    state = state.copyWith(spectrumStyle: next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(kSpectrumStylePrefKey, next.prefValue);
+    } catch (_) {}
   }
 
   /// 注册原生托盘菜单的播放控制回调
@@ -262,6 +328,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       rust_player.playerStop();
     }
     _positionTimer?.cancel();
+    _stopSpectrumTimer();
     state = state.copyWith(isPlaying: false, position: Duration.zero);
     _updateMediaSessionStopped();
   }
@@ -474,6 +541,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       _updateMediaSessionPlayback(true, Duration.zero);
 
       _startPositionTimer();
+      _startSpectrumTimer();
       _fetchOnlineInfo(song);
     } catch (e) {
       print('播放失败: $e');
@@ -601,7 +669,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
         rust_player.playerPause();
       }
       _positionTimer?.cancel();
-      state = state.copyWith(isPlaying: false);
+      _spectrumTimer?.cancel();
+      state = state.copyWith(isPlaying: false, spectrum: emptySpectrum());
       _updateMediaSessionPlayback(false, state.position);
     } else {
       if (Platform.isAndroid) {
@@ -610,6 +679,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
         rust_player.playerResume();
       }
       _startPositionTimer();
+      _startSpectrumTimer();
       state = state.copyWith(isPlaying: true);
       _updateMediaSessionPlayback(true, state.position);
     }
