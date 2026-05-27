@@ -13,6 +13,9 @@
 - 🖥️ **全屏歌词** — 沉浸式歌词浏览，支持长歌词自动换行左对齐并平滑滚动居中
 - 🎤 **桌面悬浮歌词**（Windows）— 透明置顶窗口实时显示当前歌词+下一行，支持拖拽定位、字号调节、鼠标穿透锁定
 - 🍎 **菜单栏歌词**（macOS）— 系统状态栏实时显示当前歌词，可通过状态栏菜单完成播放/暂停、上一首、下一首、显示主窗口、关闭等操作；关闭主窗口仅隐藏，应用继续在后台运行
+- 📊 **音频可视化频谱** — 实时 FFT 频谱分析（Rust 端 2048 点 realfft + 64 对数分箱），支持柱状和环形两种可视化样式，60 FPS 平滑动画，同时展示在播放页和全屏歌词页
+- 🎨 **动态主题色** — 自动从专辑封面提取主色调，整个 UI 配色（按钮、进度条、频谱、渐变背景）跟随当前歌曲动态切换，Material You 风格
+- 🃏 **歌词卡片分享** — 全屏歌词页长按任意歌词行，生成精美分享卡片（封面模糊背景 + 歌词 + 歌曲信息 + 官网二维码），可导出为高清 PNG 图片
 
 ## 📸 应用截图
 
@@ -38,18 +41,18 @@
 
 ## 🏗️ 技术架构
 
-| 层级     | 技术                | 说明                         |
-| -------- | ------------------- | ---------------------------- |
-| **UI**   | Flutter + Riverpod  | Material 3 深色主题          |
-| **桥接** | flutter_rust_bridge | Dart ↔ Rust FFI              |
-| **核心** | Rust                | 音频解码、网络请求、文件扫描 |
+| 层级     | 技术                | 说明                              |
+| -------- | ------------------- | --------------------------------- |
+| **UI**   | Flutter + Riverpod  | Material 3 动态主题（封面色提取） |
+| **桥接** | flutter_rust_bridge | Dart ↔ Rust FFI                   |
+| **核心** | Rust                | 音频解码、频谱分析、网络请求、文件扫描 |
 
 ### Rust 核心模块
 
 ```
 rust/src/
 ├── api/          # FFI 接口（player、scanner、metadata）
-├── audio/        # 音频播放引擎（rodio）
+├── audio/        # 音频播放引擎（rodio）+ 频谱分析（realfft）
 ├── network/      # QQ 音乐 API 客户端（reqwest）
 ├── models/       # 数据模型（Song、Lyrics、Library）
 └── storage/      # 本地持久化（JSON）
@@ -59,15 +62,19 @@ rust/src/
 
 ```
 lib/
-├── main.dart             # 入口
+├── main.dart             # 入口（动态主题）
 ├── pages/
 │   ├── home_page.dart    # 歌曲库列表
 │   └── player_page.dart  # 播放页 + 全屏歌词
 ├── widgets/
 │   ├── mini_player.dart  # 底部迷你播放栏
-│   └── lyrics_view.dart  # 歌词滚动组件
+│   ├── lyrics_view.dart  # 歌词滚动组件（支持长按分享）
+│   ├── lyrics_card.dart  # 歌词卡片生成与导出
+│   └── spectrum_view.dart # 频谱可视化组件（柱状/环形）
 └── providers/
     ├── app_providers.dart      # Riverpod 状态管理
+    ├── spectrum.dart           # 频谱样式枚举与常量
+    ├── dynamic_theme.dart      # 封面色提取动态主题
     └── macos_status_bar.dart   # macOS 菜单栏歌词控制器
 ```
 

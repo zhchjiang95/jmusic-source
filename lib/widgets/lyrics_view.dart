@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/widgets/lyrics_card.dart';
 
 /// 歌词滚动显示组件
 class LyricsView extends ConsumerStatefulWidget {
@@ -142,7 +143,7 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
                       final line = lyrics.lines[index];
                       final isCurrentLine = index == currentLineIndex;
 
-                      return Container(
+                      final lineWidget = Container(
                         key: _keys[index],
                         padding: const EdgeInsets.symmetric(vertical: 12.0),
                         alignment: Alignment.centerLeft,
@@ -166,6 +167,29 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
                           ),
                         ),
                       );
+
+                      // 全屏模式下长按歌词行可生成分享卡片
+                      if (widget.isFullScreen && line.text.trim().isNotEmpty) {
+                        return GestureDetector(
+                          onLongPress: () {
+                            final playerState = ref.read(playerProvider);
+                            showLyricsCardDialog(
+                              context,
+                              lyricText: line.text,
+                              songTitle:
+                                  playerState.currentSong?.title ?? '未知歌曲',
+                              artist:
+                                  playerState.currentSong?.artist ?? '未知歌手',
+                              album:
+                                  playerState.currentSong?.album ?? '',
+                              coverData: playerState.coverData,
+                            );
+                          },
+                          child: lineWidget,
+                        );
+                      }
+
+                      return lineWidget;
                     }),
                   ),
                 );
