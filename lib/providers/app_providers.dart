@@ -27,6 +27,18 @@ enum PlayMode {
   shuffle,
 }
 
+/// A-B 复读循环状态
+enum ABLoopState {
+  /// 未激活
+  off,
+
+  /// 已设置 A 点，等待设置 B 点
+  setA,
+
+  /// A-B 循环激活中
+  active,
+}
+
 /// 播放器完整状态
 class PlayerState {
   final Song? currentSong;
@@ -43,6 +55,9 @@ class PlayerState {
   final bool isLoading;
   final String? error; // 播放错误信息
   final List<double> spectrum; // 64-bin 频谱数据 (0.0~1.0)
+  final ABLoopState abLoopState; // A-B 复读状态
+  final Duration? loopStart; // A 点
+  final Duration? loopEnd; // B 点
 
   const PlayerState({
     this.currentSong,
@@ -59,6 +74,9 @@ class PlayerState {
     this.isLoading = false,
     this.error,
     this.spectrum = const [],
+    this.abLoopState = ABLoopState.off,
+    this.loopStart,
+    this.loopEnd,
   });
 
   PlayerState copyWith({
@@ -76,10 +94,14 @@ class PlayerState {
     bool? isLoading,
     String? error,
     List<double>? spectrum,
+    ABLoopState? abLoopState,
+    Duration? loopStart,
+    Duration? loopEnd,
     bool clearLyrics = false,
     bool clearCover = false,
     bool clearSong = false,
     bool clearError = false,
+    bool clearLoop = false,
   }) {
     return PlayerState(
       currentSong: clearSong ? null : (currentSong ?? this.currentSong),
@@ -96,6 +118,9 @@ class PlayerState {
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       spectrum: spectrum ?? this.spectrum,
+      abLoopState: clearLoop ? ABLoopState.off : (abLoopState ?? this.abLoopState),
+      loopStart: clearLoop ? null : (loopStart ?? this.loopStart),
+      loopEnd: clearLoop ? null : (loopEnd ?? this.loopEnd),
     );
   }
 }
@@ -369,6 +394,16 @@ class PlayerNotifier extends Notifier<PlayerState> {
       if (_isSeeking) return;
       if (state.isPlaying && state.currentSong != null) {
         final newPos = state.position + const Duration(milliseconds: 500);
+
+        // A-B 复读循环：到达 B 点时自动跳回 A 点
+        if (state.abLoopState == ABLoopState.active &&
+            state.loopStart != null &&
+            state.loopEnd != null &&
+            newPos >= state.loopEnd!) {
+          seekTo(state.loopStart!);
+          return;
+        }
+
         if (newPos >= state.duration) {
           _onPlaybackFinished();
         } else {
@@ -476,6 +511,7 @@ class PlayerNotifier extends Notifier<PlayerState> {
       clearLyrics: true,
       clearCover: true,
       clearError: true,
+      clearLoop: true,
     );
 
     // 切歌时显示默认文本
@@ -753,6 +789,47 @@ class PlayerNotifier extends Notifier<PlayerState> {
     final newMode = modes[nextIndex];
     state = state.copyWith(playMode: newMode);
     NativeUtils.updatePlayMode(newMode);
+  }
+
+  /// A-B 复读循环：切换状态
+  /// off -> setA（标记当前位置为 A 点）
+  /// setA -> active（标记当前位置为 B 点，开始循环）
+  /// active -> off（清除循环）
+  void toggleABLoop() {
+    switch (state.abLoopState) {
+      case ABLoopState.off:
+        // 设置 A 点
+        state = state.copyWith(
+          abLoopState: ABLoopState.setA,
+          loopStart: state.position,
+        );
+        break;
+      case ABLoopState.setA:
+        // 设置 B 点，激活循环
+        final loopEnd = state.position;
+        // B 点必须在 A 点之后
+        if (loopEnd > (state.loopStart ?? Duration.zero)) {
+          state = state.copyWith(
+            abLoopState: ABLoopState.active,
+            loopEnd: loopEnd,
+          );
+        } else {
+          // B 点在 A 点之前，重新设置 A 点为当前位置
+          state = state.copyWith(
+            loopStart: state.position,
+          );
+        }
+        break;
+      case ABLoopState.active:
+        // 清除循环
+        state = state.copyWith(clearLoop: true);
+        break;
+    }
+  }
+
+  /// 清除 A-B 循环
+  void clearABLoop() {
+    state = state.copyWith(clearLoop: true);
   }
 
   /// 更新当前播放歌曲的元数据和歌词（主要用于导入歌词后的实时同步）

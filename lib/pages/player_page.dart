@@ -399,6 +399,9 @@ class PlayerPage extends ConsumerWidget {
         final position = ref.watch(playerProvider.select((s) => s.position));
         final duration = ref.watch(playerProvider.select((s) => s.duration));
         final spectrum = ref.watch(playerProvider.select((s) => s.spectrum));
+        final abLoopState = ref.watch(playerProvider.select((s) => s.abLoopState));
+        final loopStart = ref.watch(playerProvider.select((s) => s.loopStart));
+        final loopEnd = ref.watch(playerProvider.select((s) => s.loopEnd));
         final progress = duration.inMilliseconds > 0
             ? (position.inMilliseconds / duration.inMilliseconds)
                 .clamp(0.0, 1.0)
@@ -416,29 +419,63 @@ class PlayerPage extends ConsumerWidget {
                   child: SpectrumView(spectrum: spectrum, opacity: 0.7),
                 ),
               ),
+              // 进度条 + A-B 区间标记
               SizedBox(
                 height: 24,
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 3,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape:
-                        const RoundSliderOverlayShape(overlayRadius: 12),
-                    activeTrackColor: theme.colorScheme.primary,
-                    inactiveTrackColor: Colors.white12,
-                    thumbColor: theme.colorScheme.primary,
-                  ),
-                  child: Slider(
-                    value: progress,
-                    onChanged: (value) {
-                      final newPos = Duration(
-                        milliseconds:
-                            (value * duration.inMilliseconds).toInt(),
-                      );
-                      ref.read(playerProvider.notifier).seekTo(newPos);
-                    },
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Stack(
+                      children: [
+                        // A-B 循环区间高亮
+                        if (abLoopState != ABLoopState.off &&
+                            loopStart != null &&
+                            duration.inMilliseconds > 0)
+                          Positioned(
+                            left: (loopStart.inMilliseconds /
+                                    duration.inMilliseconds) *
+                                constraints.maxWidth,
+                            right: loopEnd != null
+                                ? (1 -
+                                        loopEnd.inMilliseconds /
+                                            duration.inMilliseconds) *
+                                    constraints.maxWidth
+                                : 0,
+                            top: 8,
+                            bottom: 8,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        // 滑块
+                        SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(
+                                enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(
+                                overlayRadius: 12),
+                            activeTrackColor: theme.colorScheme.primary,
+                            inactiveTrackColor: Colors.white12,
+                            thumbColor: theme.colorScheme.primary,
+                          ),
+                          child: Slider(
+                            value: progress,
+                            onChanged: (value) {
+                              final newPos = Duration(
+                                milliseconds:
+                                    (value * duration.inMilliseconds).toInt(),
+                              );
+                              ref.read(playerProvider.notifier).seekTo(newPos);
+                            },
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               Padding(
@@ -451,6 +488,8 @@ class PlayerPage extends ConsumerWidget {
                       style:
                           const TextStyle(color: Colors.white38, fontSize: 12),
                     ),
+                    // A-B 复读按钮
+                    _buildABLoopButton(ref, abLoopState, loopStart, loopEnd, theme),
                     Text(
                       _formatDuration(duration),
                       style:
@@ -463,6 +502,59 @@ class PlayerPage extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  /// A-B 复读循环按钮
+  Widget _buildABLoopButton(
+    WidgetRef ref,
+    ABLoopState abLoopState,
+    Duration? loopStart,
+    Duration? loopEnd,
+    ThemeData theme,
+  ) {
+    String label;
+    Color color;
+    switch (abLoopState) {
+      case ABLoopState.off:
+        label = 'A-B';
+        color = Colors.white38;
+        break;
+      case ABLoopState.setA:
+        label = 'A: ${_formatDuration(loopStart ?? Duration.zero)}';
+        color = theme.colorScheme.primary.withValues(alpha: 0.8);
+        break;
+      case ABLoopState.active:
+        label = '${_formatDuration(loopStart ?? Duration.zero)} ↔ ${_formatDuration(loopEnd ?? Duration.zero)}';
+        color = theme.colorScheme.primary;
+        break;
+    }
+
+    return GestureDetector(
+      onTap: () => ref.read(playerProvider.notifier).toggleABLoop(),
+      onLongPress: () => ref.read(playerProvider.notifier).clearABLoop(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          color: abLoopState == ABLoopState.active
+              ? theme.colorScheme.primary.withValues(alpha: 0.2)
+              : Colors.transparent,
+          border: abLoopState != ABLoopState.off
+              ? Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.5), width: 1)
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: abLoopState != ABLoopState.off
+                ? FontWeight.w600
+                : FontWeight.normal,
+          ),
+        ),
+      ),
     );
   }
 
