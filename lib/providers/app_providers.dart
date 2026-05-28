@@ -42,7 +42,6 @@ class PlayerState {
   final bool isLoading;
   final String? error; // 播放错误信息
   final List<double> spectrum; // 64-bin 频谱数据 (0.0~1.0)
-  final SpectrumStyle spectrumStyle; // 频谱可视化样式
 
   const PlayerState({
     this.currentSong,
@@ -59,7 +58,6 @@ class PlayerState {
     this.isLoading = false,
     this.error,
     this.spectrum = const [],
-    this.spectrumStyle = SpectrumStyle.bars,
   });
 
   PlayerState copyWith({
@@ -77,7 +75,6 @@ class PlayerState {
     bool? isLoading,
     String? error,
     List<double>? spectrum,
-    SpectrumStyle? spectrumStyle,
     bool clearLyrics = false,
     bool clearCover = false,
     bool clearSong = false,
@@ -98,7 +95,6 @@ class PlayerState {
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       spectrum: spectrum ?? this.spectrum,
-      spectrumStyle: spectrumStyle ?? this.spectrumStyle,
     );
   }
 }
@@ -120,8 +116,6 @@ class PlayerNotifier extends Notifier<PlayerState> {
     NativeUtils.updateTitle('JMusic');
     // 注册托盘播放控制回调
     _registerTrayHandler();
-    // 恢复频谱样式偏好
-    _restoreSpectrumStyle();
     // 清理定时器
     ref.onDispose(() {
       _positionTimer?.cancel();
@@ -136,21 +130,8 @@ class PlayerNotifier extends Notifier<PlayerState> {
     return const PlayerState();
   }
 
-  /// 恢复频谱可视化样式偏好
-  void _restoreSpectrumStyle() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final style =
-          SpectrumStyleX.fromPref(prefs.getString(kSpectrumStylePrefKey));
-      state = state.copyWith(spectrumStyle: style);
-    } catch (_) {
-      // 默认 bars
-    }
-  }
-
   /// 启动频谱轮询定时器
   void _startSpectrumTimer() {
-    if (Platform.isAndroid) return; // Android v1 不支持
     _spectrumTimer?.cancel();
     _spectrumTimer = Timer.periodic(kSpectrumPollInterval, (_) {
       if (!state.isPlaying) return;
@@ -176,16 +157,6 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _spectrumTimer?.cancel();
     _spectrumTimer = null;
     state = state.copyWith(spectrum: emptySpectrum());
-  }
-
-  /// 切换频谱可视化样式
-  void toggleSpectrumStyle() async {
-    final next = state.spectrumStyle.next();
-    state = state.copyWith(spectrumStyle: next);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(kSpectrumStylePrefKey, next.prefValue);
-    } catch (_) {}
   }
 
   /// 注册原生托盘菜单的播放控制回调

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
-import 'package:jmusic/providers/spectrum.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
 import 'package:jmusic/widgets/spectrum_view.dart';
 
@@ -64,58 +63,12 @@ class PlayerPage extends ConsumerWidget {
                   _buildSongInfo(currentSong, theme),
                   const SizedBox(height: 12),
 
-                  // 频谱可视化（仅桌面端）
-                  if (!Platform.isAndroid)
-                    SizedBox(
-                      height: 60,
-                      child: Stack(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 32),
-                            child: Consumer(
-                              builder: (context, ref, _) {
-                                final spec = ref.watch(
-                                    playerProvider.select((s) => s.spectrum));
-                                final style = ref.watch(playerProvider
-                                    .select((s) => s.spectrumStyle));
-                                return SpectrumView(
-                                    style: style, spectrum: spec);
-                              },
-                            ),
-                          ),
-                          Positioned(
-                            right: 8,
-                            top: 4,
-                            child: Consumer(
-                              builder: (context, ref, _) {
-                                final style = ref.watch(playerProvider
-                                    .select((s) => s.spectrumStyle));
-                                return IconButton(
-                                  tooltip: '切换可视化样式',
-                                  iconSize: 18,
-                                  icon: Icon(
-                                    style == SpectrumStyle.bars
-                                        ? Icons.graphic_eq
-                                        : Icons.album,
-                                    color: Colors.white54,
-                                  ),
-                                  onPressed: () => ref
-                                      .read(playerProvider.notifier)
-                                      .toggleSpectrumStyle(),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
                   // 歌词预览（两行）
                   _buildLyricsPreview(theme),
                   const SizedBox(height: 12),
 
-                  // 进度条（独立 Consumer）
-                  _buildProgressBar(context, ref, theme),
+                  // 频谱 + 进度条（融为一体）
+                  _buildSpectrumWithProgress(context, ref, theme),
                   const SizedBox(height: 16),
 
                   // 播放控制按钮
@@ -330,8 +283,8 @@ class PlayerPage extends ConsumerWidget {
     );
   }
 
-  /// 进度条（独立 Consumer，只监听 position 和 duration）
-  Widget _buildProgressBar(
+  /// 频谱 + 进度条（柱状频谱底部紧贴进度条轨道，宽度一致）
+  Widget _buildSpectrumWithProgress(
     BuildContext context,
     WidgetRef ref,
     ThemeData theme,
@@ -340,6 +293,7 @@ class PlayerPage extends ConsumerWidget {
       builder: (context, ref, _) {
         final position = ref.watch(playerProvider.select((s) => s.position));
         final duration = ref.watch(playerProvider.select((s) => s.duration));
+        final spectrum = ref.watch(playerProvider.select((s) => s.spectrum));
         final progress = duration.inMilliseconds > 0
             ? (position.inMilliseconds / duration.inMilliseconds).clamp(
                 0.0,
@@ -351,27 +305,44 @@ class PlayerPage extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
             children: [
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 3,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
+              // 柱状频谱 — 与 Slider track 等宽（Slider 内部有 16px 水平 padding）
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  height: 32,
+                  width: double.infinity,
+                  child: SpectrumView(
+                    spectrum: spectrum,
+                    opacity: 0.7,
                   ),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 14,
-                  ),
-                  activeTrackColor: theme.colorScheme.primary,
-                  inactiveTrackColor: Colors.white12,
-                  thumbColor: theme.colorScheme.primary,
                 ),
-                child: Slider(
-                  value: progress,
-                  onChanged: (value) {
-                    final newPos = Duration(
-                      milliseconds: (value * duration.inMilliseconds).toInt(),
-                    );
-                    ref.read(playerProvider.notifier).seekTo(newPos);
-                  },
+              ),
+              // 进度条（紧贴频谱底部，无间距）
+              SizedBox(
+                height: 24,
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 12,
+                    ),
+                    activeTrackColor: theme.colorScheme.primary,
+                    inactiveTrackColor: Colors.white12,
+                    thumbColor: theme.colorScheme.primary,
+                  ),
+                  child: Slider(
+                    value: progress,
+                    onChanged: (value) {
+                      final newPos = Duration(
+                        milliseconds:
+                            (value * duration.inMilliseconds).toInt(),
+                      );
+                      ref.read(playerProvider.notifier).seekTo(newPos);
+                    },
+                  ),
                 ),
               ),
               Padding(
@@ -567,7 +538,7 @@ class _FullScreenLyricsPage extends ConsumerWidget {
             child: SafeArea(
               child: Stack(
                 children: [
-                  // 频谱背景（仅桌面端，低不透明度 + 径向遮罩）
+                  // 频谱背景（低不透明度 + 径向遮罩）
                   if (!Platform.isAndroid)
                     Positioned.fill(
                       child: IgnorePointer(
@@ -583,10 +554,7 @@ class _FullScreenLyricsPage extends ConsumerWidget {
                             builder: (context, ref, _) {
                               final spec = ref.watch(
                                   playerProvider.select((s) => s.spectrum));
-                              final style = ref.watch(playerProvider
-                                  .select((s) => s.spectrumStyle));
                               return SpectrumView(
-                                style: style,
                                 spectrum: spec,
                                 opacity: 0.25,
                               );

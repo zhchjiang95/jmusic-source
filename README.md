@@ -142,6 +142,10 @@ flutter build windows
 flutter build linux
 flutter build apk         # 构建 Android APK 包
 flutter build appbundle   # 构建 Google Play 的 AAB 格式包
+# 清缓存构建 Android APK 包
+flutter clean
+flutter_rust_bridge_codegen generate
+flutter build apk
 ```
 
 ### 🖼️ 更新应用图标

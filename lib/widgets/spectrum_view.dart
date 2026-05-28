@@ -3,18 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:jmusic/providers/spectrum.dart';
 
-/// 频谱可视化组件 — 支持 bars（柱状）和 ring（环形）两种样式。
+/// 频谱可视化组件 — 柱状频谱，底部对齐。
 ///
 /// 通过内部 Ticker 在两帧之间做线性插值，实现 60 FPS 平滑动画。
 class SpectrumView extends StatefulWidget {
-  final SpectrumStyle style;
   final List<double> spectrum;
   final double opacity;
   final Color? color;
 
   const SpectrumView({
     super.key,
-    required this.style,
     required this.spectrum,
     this.opacity = 1.0,
     this.color,
@@ -85,21 +83,14 @@ class _SpectrumViewState extends State<SpectrumView>
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        widget.color ?? Theme.of(context).colorScheme.primary;
+    final color = widget.color ?? Theme.of(context).colorScheme.primary;
     return RepaintBoundary(
       child: CustomPaint(
-        painter: widget.style == SpectrumStyle.bars
-            ? _BarsPainter(
-                spectrum: _displayed,
-                color: color,
-                opacity: widget.opacity,
-              )
-            : _RingPainter(
-                spectrum: _displayed,
-                color: color,
-                opacity: widget.opacity,
-              ),
+        painter: _BarsPainter(
+          spectrum: _displayed,
+          color: color,
+          opacity: widget.opacity,
+        ),
         size: Size.infinite,
       ),
     );
@@ -148,55 +139,4 @@ class _BarsPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BarsPainter old) => true;
-}
-
-// ─── Ring Painter ────────────────────────────────────────────────────────────
-
-class _RingPainter extends CustomPainter {
-  final List<double> spectrum;
-  final Color color;
-  final double opacity;
-
-  _RingPainter({
-    required this.spectrum,
-    required this.color,
-    required this.opacity,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bins = spectrum.length;
-    if (bins == 0) return;
-
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final baseRadius = min(size.width, size.height) * 0.32;
-    final maxBar = min(size.width, size.height) * 0.18;
-    final segmentAngle = 2 * pi / bins;
-    final gapAngle = segmentAngle * 0.15;
-    final drawAngle = segmentAngle - gapAngle;
-
-    final paint = Paint()
-      ..color = color.withValues(alpha: opacity)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = max(2.0, drawAngle * baseRadius * 0.6)
-      ..strokeCap = StrokeCap.round;
-
-    canvas.save();
-    canvas.translate(cx, cy);
-
-    for (var i = 0; i < bins; i++) {
-      final m = spectrum[i].clamp(0.0, 1.0);
-      final startAngle = -pi / 2 + i * segmentAngle + gapAngle / 2;
-      final r = baseRadius + maxBar * m;
-
-      final rect = Rect.fromCircle(center: Offset.zero, radius: r);
-      canvas.drawArc(rect, startAngle, drawAngle, false, paint);
-    }
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter old) => true;
 }
