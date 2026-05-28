@@ -11,6 +11,7 @@ import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
 import 'package:jmusic/widgets/mini_player.dart';
+import 'package:jmusic/widgets/web_remote_sheet.dart';
 import 'package:jmusic/pages/play_stats_page.dart';
 
 /// 主页 - 歌曲库列表
@@ -236,6 +237,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                         size: 20,
                       ),
                       tooltip: '播放统计',
+                    ),
+                    // Web 遥控入口
+                    IconButton(
+                      onPressed: () => WebRemoteSheet.show(context),
+                      icon: Icon(
+                        Icons.wifi_tethering,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                      tooltip: 'Web 遥控',
                     ),
                     // macOS 端的设置入口：仅在 macOS 显示
                     if (Platform.isMacOS)

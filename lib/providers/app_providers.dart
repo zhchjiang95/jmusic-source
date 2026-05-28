@@ -12,7 +12,6 @@ import 'package:jmusic/src/rust/api/play_stats.dart' as rust_play_stats;
 import 'package:jmusic/src/rust/api/media_session.dart' as rust_media_session;
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// 播放模式枚举
 enum PlayMode {
