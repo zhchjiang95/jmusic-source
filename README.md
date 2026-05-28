@@ -53,11 +53,17 @@
 | :-----------------------------------: | :----------------------------------------: |
 | ![A-B复读](screenshots/ab-loop.png) | ![歌词编辑器](screenshots/lyrics-editor.png) |
 
-### 听歌报告
+### 听歌报告与远程控制
 
-|             报告总览              |             TOP 5 歌曲              |
+|             报告总览              |             Web 遥控              |
 | :-------------------------------: | :---------------------------------: |
-| ![报告总览](screenshots/report-overview.png) | ![TOP5](screenshots/report-top5.png) |
+| ![报告总览](screenshots/report-overview.png) | ![TOP5](screenshots/web-remote.png) |
+
+### 听歌报告与变速播放
+
+|             定时关闭              |             变速播放              |
+| :-------------------------------: | :---------------------------------: |
+| ![报告总览](screenshots/timed-shutdown.png) | ![TOP5](screenshots/variable-speed-playback.png) |
 
 ## 🏗️ 技术架构
 
