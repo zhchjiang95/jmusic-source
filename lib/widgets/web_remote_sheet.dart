@@ -22,7 +22,7 @@ class WebRemoteSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final remote = ref.watch(webRemoteProvider);
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -82,7 +82,7 @@ class WebRemoteSheet extends ConsumerWidget {
               child: QrImageView(
                 data: remote.url!,
                 version: QrVersions.auto,
-                size: 180,
+                size: 135,
               ),
             ),
             const SizedBox(height: 12),

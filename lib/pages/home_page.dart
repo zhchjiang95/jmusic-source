@@ -474,21 +474,27 @@ class _HomePageState extends ConsumerState<HomePage> {
       child: Tooltip(
         message: '定位当前播放',
         child: Container(
-          width: 40,
-          height: 40,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: theme.colorScheme.surface,
+            color: theme.colorScheme.surface.withValues(alpha: 0.9),
+            border: Border.all(
+              color: primaryColor.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
             boxShadow: [
               BoxShadow(
-                color: primaryColor.withValues(alpha: 0.2),
-                blurRadius: 8,
-                spreadRadius: 1,
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: CustomPaint(
-            painter: _LocateIconPainter(color: primaryColor),
+          child: Icon(
+            Icons.my_location_rounded,
+            size: 16,
+            color: primaryColor,
           ),
         ),
       ),
@@ -1642,53 +1648,6 @@ class _HomePageState extends ConsumerState<HomePage> {
         );
       },
     );
-  }
-}
-
-/// 定位图标绘制器：中心实心圆 + 外圆环（虚线效果）
-class _LocateIconPainter extends CustomPainter {
-  final Color color;
-
-  _LocateIconPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-
-    // 外圆环（虚线段效果）
-    final outerPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-
-    const outerRadius = 13.0;
-    const segments = 8;
-    const gapAngle = 0.3; // 间隔弧度
-    const segmentAngle = (2 * 3.14159265 - segments * gapAngle) / segments;
-
-    for (int i = 0; i < segments; i++) {
-      final startAngle = i * (segmentAngle + gapAngle);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: outerRadius),
-        startAngle,
-        segmentAngle,
-        false,
-        outerPaint,
-      );
-    }
-
-    // 中心实心圆
-    final innerPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    canvas.drawCircle(center, 5.0, innerPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _LocateIconPainter oldDelegate) {
-    return oldDelegate.color != color;
   }
 }
 

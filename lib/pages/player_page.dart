@@ -8,6 +8,7 @@ import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/providers/playback_speed.dart';
 import 'package:jmusic/providers/player_style.dart';
 import 'package:jmusic/providers/sleep_timer.dart';
+import 'package:jmusic/pages/lyrics_editor_page.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
 import 'package:jmusic/widgets/particles_bg.dart';
 import 'package:jmusic/widgets/sleep_timer_sheet.dart';
@@ -25,7 +26,6 @@ class PlayerPage extends ConsumerWidget {
     final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
     final playMode = ref.watch(playerProvider.select((s) => s.playMode));
     final volume = ref.watch(playerProvider.select((s) => s.volume));
-    final hasLyrics = ref.watch(playerProvider.select((s) => s.lyrics != null));
     final visualStyle = ref.watch(playerVisualStyleProvider);
     final theme = Theme.of(context);
     final notifier = ref.read(playerProvider.notifier);
@@ -62,7 +62,7 @@ class PlayerPage extends ConsumerWidget {
               SafeArea(
                 child: Column(
                   children: [
-                    _buildAppBar(context, ref, hasLyrics),
+                    _buildAppBar(context, ref),
                     const SizedBox(height: 20),
                     Expanded(
                       flex: 5,
@@ -154,7 +154,7 @@ class PlayerPage extends ConsumerWidget {
   }
 
   /// 顶部导航栏
-  Widget _buildAppBar(BuildContext context, WidgetRef ref, bool hasLyrics) {
+  Widget _buildAppBar(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Row(
@@ -183,6 +183,18 @@ class PlayerPage extends ConsumerWidget {
               );
             },
           ),
+          // 歌词编辑器入口
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const LyricsEditorPage(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.edit_note, color: Colors.white70, size: 22),
+            tooltip: '歌词编辑器',
+          ),
           // 保存信息到文件
           Consumer(
             builder: (context, ref, _) {
@@ -198,25 +210,11 @@ class PlayerPage extends ConsumerWidget {
                 icon: Icon(
                   Icons.save_alt,
                   color: canSave ? Colors.white : Colors.white24,
+                  size: 20,
                 ),
                 tooltip: '保存信息到文件',
               );
             },
-          ),
-          IconButton(
-            onPressed: hasLyrics
-                ? () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const _FullScreenLyricsPage(),
-                      ),
-                    );
-                  }
-                : null,
-            icon: Icon(
-              Icons.lyrics_outlined,
-              color: hasLyrics ? Colors.white : Colors.white24,
-            ),
           ),
         ],
       ),
@@ -355,33 +353,65 @@ class PlayerPage extends ConsumerWidget {
             ? lyrics.lines[currentLineIndex + 1].text
             : '';
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            children: [
-              Text(
-                currentText,
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const _FullScreenLyricsPage(),
               ),
-              const SizedBox(height: 2),
-              Text(
-                nextText,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.35),
-                  fontSize: 13,
+            );
+          },
+          onHorizontalDragEnd: (details) {
+            // 向左滑动打开全屏歌词
+            if (details.primaryVelocity != null &&
+                details.primaryVelocity! < -200) {
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const _FullScreenLyricsPage(),
+                  transitionsBuilder: (_, animation, __, child) {
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(1, 0),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOutCubic,
+                      )),
+                      child: child,
+                    );
+                  },
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ],
+              );
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              children: [
+                Text(
+                  currentText,
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  nextText,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
         );
       },
