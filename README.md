@@ -6,16 +6,21 @@
 
 - 🎶 **本地音乐播放** — 支持 MP3 / FLAC / WAV / OGG 等主流格式
 - 📂 **目录扫描** — 选择音乐目录自动扫描并建立歌曲库
+- ☁️ **WebDAV 音乐源** — 添加 WebDAV 地址（坚果云/Nextcloud/NAS）直接播放云端音乐，自动本地缓存
 - 🔍 **在线匹配** — ~~自动从 QQ 音乐搜索匹配歌曲信息~~（可能失效，使用手动编辑并写入到源文件）
 - 📝 **歌词同步** — ~~在线获取 LRC 歌词，逐行高亮滚动~~（可能失效，使用手动导入歌词并写入到源文件）
 - 🖼️ **专辑封面** — ~~自动获取高清专辑封面~~（可能失效，使用手动导入专辑封面并写入到源文件）
 - 🔁 **播放模式** — 顺序播放 / 单曲循环 / 随机播放
+- ⏩ **变速播放** — 0.5x~2.0x 播放速度调节，适合播客/学习场景；预设按钮 + 滑块精细控制
+- 😴 **睡前定时** — 10~90 分钟定时停止，支持渐弱音量（最后 N 秒线性降低），可延时
 - 🖥️ **全屏歌词** — 沉浸式歌词浏览，支持长歌词自动换行左对齐并平滑滚动居中
 - 🎤 **桌面悬浮歌词**（Windows）— 透明置顶窗口实时显示当前歌词+下一行，支持拖拽定位、字号调节、鼠标穿透锁定
 - 🍎 **菜单栏歌词**（macOS）— 系统状态栏实时显示当前歌词，可通过状态栏菜单完成播放/暂停、上一首、下一首、显示主窗口、关闭等操作；关闭主窗口仅隐藏，应用继续在后台运行
-- 📊 **音频可视化频谱** — 实时 FFT 频谱分析（Rust 端 2048 点 realfft + 64 对数分箱），支持柱状和环形两种可视化样式，60 FPS 平滑动画，同时展示在播放页和全屏歌词页
+- 📊 **音频可视化频谱** — 实时 FFT 频谱分析（Rust 端 2048 点 realfft + 64 对数分箱），柱状频谱与进度条融为一体，60 FPS 平滑动画
 - 🎨 **动态主题色** — 自动从专辑封面提取主色调，整个 UI 配色（按钮、进度条、频谱、渐变背景）跟随当前歌曲动态切换，Material You 风格
+- 🎭 **播放页视觉风格** — 三种可选风格：标准渐变 / 封面高斯模糊背景 / 黑胶唱片旋转+粒子效果；点击封面区域切换
 - 🃏 **歌词卡片分享** — 全屏歌词页长按任意歌词行，生成精美分享卡片（封面模糊背景 + 歌词 + 歌曲信息 + 官网二维码），可导出为高清 PNG 图片
+- 📡 **Web 遥控** — 局域网内手机浏览器扫码控制播放（HTTP + WebSocket，端口 9621），支持播放/暂停、切歌、音量、进度拖拽、播放列表选曲
 
 ## 📸 应用截图
 
@@ -65,16 +70,32 @@ lib/
 ├── main.dart             # 入口（动态主题）
 ├── pages/
 │   ├── home_page.dart    # 歌曲库列表
-│   └── player_page.dart  # 播放页 + 全屏歌词
+│   ├── player_page.dart  # 播放页（三种视觉风格）+ 全屏歌词
+│   └── play_stats_page.dart # 播放统计
+├── services/
+│   ├── web_remote.dart        # Web 遥控 HTTP+WebSocket 服务器
+│   ├── web_remote_html.dart   # 遥控页面内嵌 HTML
+│   └── webdav_service.dart    # WebDAV 协议通信（列目录/下载/缓存）
 ├── widgets/
-│   ├── mini_player.dart  # 底部迷你播放栏
-│   ├── lyrics_view.dart  # 歌词滚动组件（支持长按分享）
-│   ├── lyrics_card.dart  # 歌词卡片生成与导出
-│   └── spectrum_view.dart # 频谱可视化组件（柱状/环形）
+│   ├── mini_player.dart       # 底部迷你播放栏
+│   ├── lyrics_view.dart       # 歌词滚动组件（支持长按分享）
+│   ├── lyrics_card.dart       # 歌词卡片生成与导出
+│   ├── spectrum_view.dart     # 频谱可视化组件（柱状）
+│   ├── vinyl_disc.dart        # 黑胶唱片旋转组件
+│   ├── particles_bg.dart      # 粒子背景动画
+│   ├── web_remote_sheet.dart  # Web 遥控管理面板
+│   ├── webdav_sheet.dart      # WebDAV 音乐源管理面板
+│   ├── sleep_timer_sheet.dart # 睡前定时器面板
+│   └── speed_control_sheet.dart # 变速控制面板
 └── providers/
-    ├── app_providers.dart      # Riverpod 状态管理
-    ├── spectrum.dart           # 频谱样式枚举与常量
+    ├── app_providers.dart      # Riverpod 状态管理（播放器+歌曲库）
+    ├── spectrum.dart           # 频谱常量
     ├── dynamic_theme.dart      # 封面色提取动态主题
+    ├── player_style.dart       # 播放页视觉风格（标准/模糊/黑胶）
+    ├── playback_speed.dart     # 播放速度控制
+    ├── sleep_timer.dart        # 睡前定时器
+    ├── web_remote_provider.dart # Web 遥控服务状态
+    ├── webdav_provider.dart    # WebDAV 音乐源状态
     └── macos_status_bar.dart   # macOS 菜单栏歌词控制器
 ```
 
