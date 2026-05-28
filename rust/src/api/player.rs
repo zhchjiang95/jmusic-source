@@ -97,3 +97,12 @@ pub fn player_get_spectrum() -> Option<Vec<f32>> {
     let guard = AUDIO_ENGINE.lock().unwrap();
     guard.as_ref().and_then(|e| e.analyzer().snapshot())
 }
+
+/// 设置播放速度（0.5 ~ 2.0）
+#[flutter_rust_bridge::frb(sync)]
+pub fn player_set_speed(speed: f32) -> Result<(), String> {
+    let guard = AUDIO_ENGINE.lock().unwrap();
+    let engine = guard.as_ref().ok_or("音频引擎未初始化")?;
+    engine.set_speed(speed);
+    Ok(())
+}

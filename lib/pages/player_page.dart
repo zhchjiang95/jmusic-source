@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/providers/playback_speed.dart';
 import 'package:jmusic/providers/player_style.dart';
 import 'package:jmusic/providers/sleep_timer.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
 import 'package:jmusic/widgets/particles_bg.dart';
 import 'package:jmusic/widgets/sleep_timer_sheet.dart';
+import 'package:jmusic/widgets/speed_control_sheet.dart';
 import 'package:jmusic/widgets/spectrum_view.dart';
 import 'package:jmusic/widgets/vinyl_disc.dart';
 
@@ -512,16 +514,33 @@ class PlayerPage extends ConsumerWidget {
             icon: const Icon(Icons.skip_next_rounded,
                 color: Colors.white, size: 36),
           ),
-          IconButton(
-            onPressed: () {
-              final vol = volume > 0 ? 0.0 : 0.8;
-              ref.read(playerProvider.notifier).setVolume(vol);
+          // 变速按钮
+          Consumer(
+            builder: (context, ref, _) {
+              final speed = ref.watch(playbackSpeedProvider);
+              final isDefault = (speed - 1.0).abs() < 0.01;
+              return GestureDetector(
+                onTap: () => SpeedControlSheet.show(context),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: isDefault
+                        ? Colors.transparent
+                        : theme.colorScheme.primary.withValues(alpha: 0.2),
+                  ),
+                  child: Text(
+                    '${speed.toStringAsFixed(speed == speed.roundToDouble() ? 1 : 2)}x',
+                    style: TextStyle(
+                      color: isDefault ? Colors.white70 : theme.colorScheme.primary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
             },
-            icon: Icon(
-              volume > 0 ? Icons.volume_up : Icons.volume_off,
-              color: Colors.white70,
-              size: 24,
-            ),
           ),
         ],
       ),

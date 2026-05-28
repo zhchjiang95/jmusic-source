@@ -13,6 +13,7 @@ import 'package:jmusic/src/rust/api/media_session.dart' as rust_media_session;
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
 import 'package:jmusic/providers/webdav_provider.dart';
+import 'package:jmusic/providers/playback_speed.dart';
 
 /// 播放模式枚举
 enum PlayMode {
@@ -494,6 +495,16 @@ class PlayerNotifier extends Notifier<PlayerState> {
       } else {
         rust_player.playerPlay(filePath: playPath);
         rust_player.playerSetVolume(volume: state.volume);
+      }
+
+      // 恢复当前播放速度
+      final speed = ref.read(playbackSpeedProvider);
+      if (speed != 1.0) {
+        if (Platform.isAndroid) {
+          _androidPlayer('setSpeed', speed.toString());
+        } else {
+          rust_player.playerSetSpeed(speed: speed);
+        }
       }
 
       state = state.copyWith(

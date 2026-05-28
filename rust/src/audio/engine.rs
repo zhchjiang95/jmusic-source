@@ -21,6 +21,8 @@ enum AudioCommand {
     SetVolume(f32),
     /// 获取音量
     GetVolume(mpsc::Sender<f32>),
+    /// 设置播放速度（0.5~2.0）
+    SetSpeed(f32),
     /// 跳转到指定位置（秒）
     Seek(f64, mpsc::Sender<Result<(), String>>),
     /// 检查是否播放完毕
@@ -112,6 +114,11 @@ impl AudioEngine {
                     AudioCommand::SetVolume(vol) => {
                         if let Some(s) = &sink {
                             s.set_volume(vol.clamp(0.0, 1.0));
+                        }
+                    }
+                    AudioCommand::SetSpeed(speed) => {
+                        if let Some(s) = &sink {
+                            s.set_speed(speed.clamp(0.25, 3.0));
                         }
                     }
                     AudioCommand::GetVolume(reply) => {
@@ -206,6 +213,11 @@ impl AudioEngine {
     /// 设置音量（0.0 ~ 1.0）
     pub fn set_volume(&self, volume: f32) {
         let _ = self.cmd_tx.send(AudioCommand::SetVolume(volume));
+    }
+
+    /// 设置播放速度（0.5 ~ 2.0）
+    pub fn set_speed(&self, speed: f32) {
+        let _ = self.cmd_tx.send(AudioCommand::SetSpeed(speed));
     }
 
     /// 获取当前音量

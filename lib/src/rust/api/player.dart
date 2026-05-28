@@ -45,3 +45,7 @@ String? playerGetCurrentFile() =>
 /// 获取最新的 64-bin 频谱帧（归一化 0.0~1.0），无帧时返回 None
 Float32List? playerGetSpectrum() =>
     RustLib.instance.api.crateApiPlayerPlayerGetSpectrum();
+
+/// 设置播放速度（0.5 ~ 2.0）
+void playerSetSpeed({required double speed}) =>
+    RustLib.instance.api.crateApiPlayerPlayerSetSpeed(speed: speed);
