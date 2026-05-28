@@ -12,6 +12,8 @@ import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
 import 'package:jmusic/src/rust/api/scanner.dart' as rust_scanner;
 import 'package:jmusic/widgets/mini_player.dart';
 import 'package:jmusic/widgets/web_remote_sheet.dart';
+import 'package:jmusic/widgets/webdav_sheet.dart';
+import 'package:jmusic/providers/webdav_provider.dart';
 import 'package:jmusic/pages/play_stats_page.dart';
 
 /// 主页 - 歌曲库列表
@@ -93,7 +95,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   /// 获取当前搜索过滤后的歌曲列表
   List<Song> _getFilteredSongs() {
-    final songs = ref.read(libraryProvider).songs;
+    final songs = [
+      ...ref.read(libraryProvider).songs,
+      ...ref.read(webDavProvider).songs,
+    ];
     if (_searchQuery.isEmpty) return songs;
     final q = _searchQuery.toLowerCase();
     return songs
@@ -130,8 +135,12 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final libraryState = ref.watch(libraryProvider);
+    final webDavState = ref.watch(webDavProvider);
     final playerState = ref.watch(playerProvider);
     final theme = Theme.of(context);
+
+    // 合并本地 + WebDAV 歌曲
+    final allSongs = [...libraryState.songs, ...webDavState.songs];
 
     // 在 macOS 平台主动激活菜单栏歌词控制器（懒加载 Provider 必须有人 watch 才会 build）
     if (Platform.isMacOS) {
@@ -149,8 +158,8 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     // 根据搜索关键词过滤歌曲
     final filteredSongs = _searchQuery.isEmpty
-        ? libraryState.songs
-        : libraryState.songs.where((song) {
+        ? allSongs
+        : allSongs.where((song) {
             final q = _searchQuery.toLowerCase();
             return song.title.toLowerCase().contains(q) ||
                 song.artist.toLowerCase().contains(q) ||
@@ -193,9 +202,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                     //   ),
                     // ),
                     const Spacer(),
-                    if (libraryState.songs.isNotEmpty)
+                    if (allSongs.isNotEmpty)
                       Text(
-                        '${filteredSongs.length}/${libraryState.songs.length} 首',
+                        '${filteredSongs.length}/${allSongs.length} 首',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface.withValues(
                             alpha: 0.5,
@@ -248,6 +257,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                       tooltip: 'Web 遥控',
                     ),
+                    // WebDAV 音乐源
+                    IconButton(
+                      onPressed: () => WebDavSheet.show(context),
+                      icon: Icon(
+                        Icons.cloud_outlined,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
+                      tooltip: 'WebDAV 音乐源',
+                    ),
                     // macOS 端的设置入口：仅在 macOS 显示
                     if (Platform.isMacOS)
                       IconButton(
@@ -264,7 +283,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
 
               // 搜索框
-              if (libraryState.songs.isNotEmpty)
+              if (allSongs.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   child: SizedBox(
@@ -333,7 +352,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               Expanded(
                 child: Stack(
                   children: [
-                    libraryState.songs.isEmpty
+                    allSongs.isEmpty
                         ? _buildEmptyState(context, ref, libraryState)
                         : _buildSongList(
                             context,

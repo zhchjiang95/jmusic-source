@@ -12,6 +12,7 @@ import 'package:jmusic/src/rust/api/play_stats.dart' as rust_play_stats;
 import 'package:jmusic/src/rust/api/media_session.dart' as rust_media_session;
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
+import 'package:jmusic/providers/webdav_provider.dart';
 
 /// 播放模式枚举
 enum PlayMode {
@@ -480,11 +481,18 @@ class PlayerNotifier extends Notifier<PlayerState> {
     NativeUtils.updateLyricsOverlay(_defaultOverlayText(song), '');
 
     try {
+      // WebDAV 文件需要先下载到本地缓存
+      String playPath = song.filePath;
+      if (playPath.startsWith('webdav://')) {
+        final webDav = ref.read(webDavProvider.notifier);
+        playPath = await webDav.ensureLocalFile(song);
+      }
+
       if (Platform.isAndroid) {
-        await _androidPlayer('play', song.filePath);
+        await _androidPlayer('play', playPath);
         await _androidPlayer('setVolume', state.volume.toString());
       } else {
-        rust_player.playerPlay(filePath: song.filePath);
+        rust_player.playerPlay(filePath: playPath);
         rust_player.playerSetVolume(volume: state.volume);
       }
 
