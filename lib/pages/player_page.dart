@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/providers/playback_speed.dart';
 import 'package:jmusic/providers/player_style.dart';
@@ -361,7 +362,41 @@ class PlayerPage extends ConsumerWidget {
         );
 
         if (lyrics == null || lyrics.lines.isEmpty) {
-          return const SizedBox(height: 40);
+          final currentSong = ref.watch(
+            playerProvider.select((s) => s.currentSong),
+          );
+          final songTitle = currentSong?.title ?? '';
+          return SizedBox(
+            height: 40,
+            child: songTitle.isNotEmpty
+                ? Center(
+                    child: GestureDetector(
+                      onTap: () => _showSearchLyricsOptions(context, songTitle),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Text(
+                          '搜索歌词',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : null,
+          );
         }
 
         int currentLineIndex = -1;
@@ -418,6 +453,88 @@ class PlayerPage extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// 显示搜索歌词渠道选项
+  void _showSearchLyricsOptions(BuildContext context, String songTitle) {
+    final encoded = Uri.encodeComponent(songTitle);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '搜索歌词',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.search, color: Colors.white70),
+                  title: const Text(
+                    '渠道1 - lrc.64h.cn',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openUrl(
+                      'https://cn.bing.com/search?q=$encoded%20site%3Alrc.64h.cn',
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.search, color: Colors.white70),
+                  title: const Text(
+                    '渠道2 - music.163.com',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openUrl(
+                      'https://cn.bing.com/search?q=$encoded%20site%3Amusic.163.com',
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.search, color: Colors.white70),
+                  title: const Text(
+                    '渠道3 - 1ting.com',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openUrl(
+                      'https://cn.bing.com/search?q=$encoded%20site%3A1ting.com',
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 使用默认浏览器打开URL
+  void _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   /// 频谱 + 进度条
