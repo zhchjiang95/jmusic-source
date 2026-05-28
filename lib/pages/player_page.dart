@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/providers/player_style.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
+import 'package:jmusic/widgets/particles_bg.dart';
 import 'package:jmusic/widgets/spectrum_view.dart';
+import 'package:jmusic/widgets/vinyl_disc.dart';
 
 /// 全屏播放页面
 class PlayerPage extends ConsumerWidget {
@@ -14,12 +17,12 @@ class PlayerPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 只监听基本歌曲信息和播放状态（不含 position/coverData）
     final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
     final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
     final playMode = ref.watch(playerProvider.select((s) => s.playMode));
     final volume = ref.watch(playerProvider.select((s) => s.volume));
     final hasLyrics = ref.watch(playerProvider.select((s) => s.lyrics != null));
+    final visualStyle = ref.watch(playerVisualStyleProvider);
     final theme = Theme.of(context);
     final notifier = ref.read(playerProvider.notifier);
 
@@ -35,49 +38,112 @@ class PlayerPage extends ConsumerWidget {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  theme.colorScheme.primary.withValues(alpha: 0.3),
-                  const Color(0xFF121212),
-                  const Color(0xFF0A0A0A),
-                ],
+          body: Stack(
+            children: [
+              // 背景层
+              Positioned.fill(
+                child: _buildBackground(ref, visualStyle, theme),
               ),
-            ),
-            child: SafeArea(
-              child: Column(
+              // 粒子层（仅 vinyl 风格）
+              if (visualStyle == PlayerVisualStyle.vinyl)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ParticlesBackground(
+                      color: theme.colorScheme.primary,
+                      active: isPlaying,
+                    ),
+                  ),
+                ),
+              // 主内容
+              SafeArea(
+                child: Column(
+                  children: [
+                    _buildAppBar(context, ref, hasLyrics),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      flex: 5,
+                      child: _buildAlbumArt(
+                          ref, visualStyle, isPlaying, theme),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildSongInfo(currentSong, theme),
+                    const SizedBox(height: 12),
+                    _buildLyricsPreview(theme),
+                    const SizedBox(height: 12),
+                    _buildSpectrumWithProgress(context, ref, theme),
+                    const SizedBox(height: 16),
+                    _buildControls(ref, isPlaying, playMode, volume, theme),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 背景层 — 根据风格切换
+  Widget _buildBackground(
+      WidgetRef ref, PlayerVisualStyle style, ThemeData theme) {
+    switch (style) {
+      case PlayerVisualStyle.blur:
+        // 封面高斯模糊背景
+        return Consumer(
+          builder: (context, ref, _) {
+            final coverData =
+                ref.watch(playerProvider.select((s) => s.coverData));
+            if (coverData != null) {
+              return Stack(
+                fit: StackFit.expand,
                 children: [
-                  // 顶部导航栏
-                  _buildAppBar(context, ref, hasLyrics),
-                  const SizedBox(height: 20),
-
-                  // 专辑封面（独立 Consumer）
-                  Expanded(flex: 5, child: _buildAlbumArt(theme)),
-
-                  const SizedBox(height: 20),
-
-                  // 歌曲信息
-                  _buildSongInfo(currentSong, theme),
-                  const SizedBox(height: 12),
-
-                  // 歌词预览（两行）
-                  _buildLyricsPreview(theme),
-                  const SizedBox(height: 12),
-
-                  // 频谱 + 进度条（融为一体）
-                  _buildSpectrumWithProgress(context, ref, theme),
-                  const SizedBox(height: 16),
-
-                  // 播放控制按钮
-                  _buildControls(ref, isPlaying, playMode, volume, theme),
-                  const SizedBox(height: 20),
+                  Image.memory(
+                    Uint8List.fromList(coverData),
+                    fit: BoxFit.cover,
+                    gaplessPlayback: true,
+                  ),
+                  BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.5),
+                    ),
+                  ),
                 ],
-              ),
+              );
+            }
+            return _defaultGradientBg(theme);
+          },
+        );
+
+      case PlayerVisualStyle.vinyl:
+        // 深色背景
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF1a1a2e), Color(0xFF0a0a0a)],
             ),
           ),
+        );
+
+      case PlayerVisualStyle.standard:
+        return _defaultGradientBg(theme);
+    }
+  }
+
+  Widget _defaultGradientBg(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.3),
+            const Color(0xFF121212),
+            const Color(0xFF0A0A0A),
+          ],
         ),
       ),
     );
@@ -134,42 +200,60 @@ class PlayerPage extends ConsumerWidget {
     );
   }
 
-  /// 专辑封面（使用独立 Consumer 避免因 position 更新而重建）
-  Widget _buildAlbumArt(ThemeData theme) {
-    return Center(
-      child: Hero(
-        tag: 'album_art',
-        child: Consumer(
-          builder: (context, ref, _) {
-            final coverData = ref.watch(
-              playerProvider.select((s) => s.coverData),
-            );
-            return Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                    blurRadius: 40,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: coverData != null
-                    ? Image.memory(
-                        Uint8List.fromList(coverData),
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                        errorBuilder: (_, __, ___) => _buildDefaultCover(theme),
-                      )
-                    : _buildDefaultCover(theme),
-              ),
-            );
-          },
+  /// 专辑封面 — 根据风格切换，点击切换风格
+  Widget _buildAlbumArt(WidgetRef ref, PlayerVisualStyle style,
+      bool isPlaying, ThemeData theme) {
+    return GestureDetector(
+      onTap: () => ref.read(playerVisualStyleProvider.notifier).next(),
+      child: Center(
+        child: Hero(
+          tag: 'album_art',
+          child: Consumer(
+            builder: (context, ref, _) {
+              final coverData = ref.watch(
+                playerProvider.select((s) => s.coverData),
+              );
+
+              switch (style) {
+                case PlayerVisualStyle.vinyl:
+                  return VinylDisc(
+                    coverData: coverData,
+                    isPlaying: isPlaying,
+                    size: 280,
+                  );
+
+                case PlayerVisualStyle.blur:
+                case PlayerVisualStyle.standard:
+                  return Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.3),
+                          blurRadius: 40,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: coverData != null
+                          ? Image.memory(
+                              Uint8List.fromList(coverData),
+                              fit: BoxFit.cover,
+                              gaplessPlayback: true,
+                              errorBuilder: (_, __, ___) =>
+                                  _buildDefaultCover(theme),
+                            )
+                          : _buildDefaultCover(theme),
+                    ),
+                  );
+              }
+            },
+          ),
         ),
       ),
     );
@@ -221,7 +305,7 @@ class PlayerPage extends ConsumerWidget {
     );
   }
 
-  /// 歌词预览（当前行 + 下一行，独立 Consumer）
+  /// 歌词预览
   Widget _buildLyricsPreview(ThemeData theme) {
     return Consumer(
       builder: (context, ref, _) {
@@ -234,7 +318,6 @@ class PlayerPage extends ConsumerWidget {
           return const SizedBox(height: 40);
         }
 
-        // 找到当前歌词行
         int currentLineIndex = -1;
         for (int i = lyrics.lines.length - 1; i >= 0; i--) {
           if (lyrics.lines[i].timeMs.toInt() <= currentMs) {
@@ -243,9 +326,8 @@ class PlayerPage extends ConsumerWidget {
           }
         }
 
-        final currentText = currentLineIndex >= 0
-            ? lyrics.lines[currentLineIndex].text
-            : '';
+        final currentText =
+            currentLineIndex >= 0 ? lyrics.lines[currentLineIndex].text : '';
         final nextText = currentLineIndex + 1 < lyrics.lines.length
             ? lyrics.lines[currentLineIndex + 1].text
             : '';
@@ -283,7 +365,7 @@ class PlayerPage extends ConsumerWidget {
     );
   }
 
-  /// 频谱 + 进度条（柱状频谱底部紧贴进度条轨道，宽度一致）
+  /// 频谱 + 进度条
   Widget _buildSpectrumWithProgress(
     BuildContext context,
     WidgetRef ref,
@@ -295,40 +377,31 @@ class PlayerPage extends ConsumerWidget {
         final duration = ref.watch(playerProvider.select((s) => s.duration));
         final spectrum = ref.watch(playerProvider.select((s) => s.spectrum));
         final progress = duration.inMilliseconds > 0
-            ? (position.inMilliseconds / duration.inMilliseconds).clamp(
-                0.0,
-                1.0,
-              )
+            ? (position.inMilliseconds / duration.inMilliseconds)
+                .clamp(0.0, 1.0)
             : 0.0;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(
             children: [
-              // 柱状频谱 — 与 Slider track 等宽（Slider 内部有 16px 水平 padding）
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SizedBox(
                   height: 32,
                   width: double.infinity,
-                  child: SpectrumView(
-                    spectrum: spectrum,
-                    opacity: 0.7,
-                  ),
+                  child: SpectrumView(spectrum: spectrum, opacity: 0.7),
                 ),
               ),
-              // 进度条（紧贴频谱底部，无间距）
               SizedBox(
                 height: 24,
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 3,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 6,
-                    ),
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 12,
-                    ),
+                    thumbShape:
+                        const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape:
+                        const RoundSliderOverlayShape(overlayRadius: 12),
                     activeTrackColor: theme.colorScheme.primary,
                     inactiveTrackColor: Colors.white12,
                     thumbColor: theme.colorScheme.primary,
@@ -352,17 +425,13 @@ class PlayerPage extends ConsumerWidget {
                   children: [
                     Text(
                       _formatDuration(position),
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 12,
-                      ),
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 12),
                     ),
                     Text(
                       _formatDuration(duration),
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 12,
-                      ),
+                      style:
+                          const TextStyle(color: Colors.white38, fontSize: 12),
                     ),
                   ],
                 ),
@@ -387,7 +456,6 @@ class PlayerPage extends ConsumerWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // 播放模式
           IconButton(
             onPressed: () => ref.read(playerProvider.notifier).togglePlayMode(),
             icon: Icon(
@@ -396,16 +464,11 @@ class PlayerPage extends ConsumerWidget {
               size: 24,
             ),
           ),
-          // 上一首
           IconButton(
             onPressed: () => ref.read(playerProvider.notifier).previous(),
-            icon: const Icon(
-              Icons.skip_previous_rounded,
-              color: Colors.white,
-              size: 36,
-            ),
+            icon: const Icon(Icons.skip_previous_rounded,
+                color: Colors.white, size: 36),
           ),
-          // 播放/暂停
           Container(
             width: 64,
             height: 64,
@@ -423,16 +486,11 @@ class PlayerPage extends ConsumerWidget {
               ),
             ),
           ),
-          // 下一首
           IconButton(
             onPressed: () => ref.read(playerProvider.notifier).next(),
-            icon: const Icon(
-              Icons.skip_next_rounded,
-              color: Colors.white,
-              size: 36,
-            ),
+            icon: const Icon(Icons.skip_next_rounded,
+                color: Colors.white, size: 36),
           ),
-          // 音量
           IconButton(
             onPressed: () {
               final vol = volume > 0 ? 0.0 : 0.8;
@@ -449,7 +507,6 @@ class PlayerPage extends ConsumerWidget {
     );
   }
 
-  /// 获取播放模式图标
   IconData _getPlayModeIcon(PlayMode mode) {
     switch (mode) {
       case PlayMode.sequential:
@@ -461,23 +518,19 @@ class PlayerPage extends ConsumerWidget {
     }
   }
 
-  /// 格式化时长
   String _formatDuration(Duration d) {
     final mins = d.inMinutes.toString().padLeft(2, '0');
     final secs = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$mins:$secs';
   }
 
-  /// 将歌曲信息、歌词和封面保存到源文件
   Future<void> _saveToFile(BuildContext context, WidgetRef ref) async {
     final player = ref.read(playerProvider);
     final song = player.currentSong;
     if (song == null) return;
 
     try {
-      await ref
-          .read(libraryProvider.notifier)
-          .saveAllMetadataAndUpdate(
+      await ref.read(libraryProvider.notifier).saveAllMetadataAndUpdate(
             song: song,
             lyricsText: player.lrcText,
             coverData: player.coverData,
@@ -493,9 +546,8 @@ class PlayerPage extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('保存失败: $e')));
       }
     }
   }
@@ -563,105 +615,93 @@ class _FullScreenLyricsPage extends ConsumerWidget {
                         ),
                       ),
                     ),
-                  // 主内容
                   Column(
-                children: [
-                  // 顶部栏
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white70,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                currentSong?.title ?? '',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                currentSong?.artist ?? '',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // 歌词滚动区域
-                  const Expanded(child: LyricsView(isFullScreen: true)),
-                  // 底部简化控制栏
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(32, 8, 32, 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          onPressed: () =>
-                              ref.read(playerProvider.notifier).previous(),
-                          icon: const Icon(
-                            Icons.skip_previous_rounded,
-                            color: Colors.white70,
-                            size: 32,
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: theme.colorScheme.primary,
-                          ),
-                          child: IconButton(
-                            onPressed: () => ref
-                                .read(playerProvider.notifier)
-                                .togglePlayPause(),
-                            icon: Icon(
-                              isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 28,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.arrow_back,
+                                  color: Colors.white70),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    currentSong?.title ?? '',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    currentSong?.artist ?? '',
+                                    style: const TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 24),
-                        IconButton(
-                          onPressed: () =>
-                              ref.read(playerProvider.notifier).next(),
-                          icon: const Icon(
-                            Icons.skip_next_rounded,
-                            color: Colors.white70,
-                            size: 32,
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Expanded(child: LyricsView(isFullScreen: true)),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(32, 8, 32, 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              onPressed: () =>
+                                  ref.read(playerProvider.notifier).previous(),
+                              icon: const Icon(Icons.skip_previous_rounded,
+                                  color: Colors.white70, size: 32),
+                            ),
+                            const SizedBox(width: 24),
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: theme.colorScheme.primary,
+                              ),
+                              child: IconButton(
+                                onPressed: () => ref
+                                    .read(playerProvider.notifier)
+                                    .togglePlayPause(),
+                                icon: Icon(
+                                  isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            IconButton(
+                              onPressed: () =>
+                                  ref.read(playerProvider.notifier).next(),
+                              icon: const Icon(Icons.skip_next_rounded,
+                                  color: Colors.white70, size: 32),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
                 ],
               ),
             ),
