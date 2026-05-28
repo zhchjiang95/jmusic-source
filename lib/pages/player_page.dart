@@ -41,13 +41,37 @@ class PlayerPage extends ConsumerWidget {
       },
       child: Focus(
         autofocus: true,
-        child: Scaffold(
-          body: Stack(
-            children: [
-              // 背景层
-              Positioned.fill(
-                child: _buildBackground(ref, visualStyle, theme),
-              ),
+        child: GestureDetector(
+          onPanEnd: (details) {
+            // 整个页面向左滑动打开全屏歌词
+            final hasLyrics = ref.read(playerProvider).lyrics != null;
+            if (hasLyrics && details.velocity.pixelsPerSecond.dx < -200) {
+              Navigator.of(context).push(
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const _FullScreenLyricsPage(),
+                  transitionsBuilder: (_, animation, __, child) {
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(1, 0),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOutCubic,
+                      )),
+                      child: child,
+                    );
+                  },
+                ),
+              );
+            }
+          },
+          child: Scaffold(
+            body: Stack(
+              children: [
+                // 背景层
+                Positioned.fill(
+                  child: _buildBackground(ref, visualStyle, theme),
+                ),
               // 粒子层（仅 vinyl 风格）
               if (visualStyle == PlayerVisualStyle.vinyl)
                 Positioned.fill(
@@ -84,6 +108,7 @@ class PlayerPage extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -360,29 +385,6 @@ class PlayerPage extends ConsumerWidget {
                 builder: (_) => const _FullScreenLyricsPage(),
               ),
             );
-          },
-          onHorizontalDragEnd: (details) {
-            // 向左滑动打开全屏歌词
-            if (details.primaryVelocity != null &&
-                details.primaryVelocity! < -200) {
-              Navigator.of(context).push(
-                PageRouteBuilder(
-                  pageBuilder: (_, __, ___) => const _FullScreenLyricsPage(),
-                  transitionsBuilder: (_, animation, __, child) {
-                    return SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(1, 0),
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeOutCubic,
-                      )),
-                      child: child,
-                    );
-                  },
-                ),
-              );
-            }
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),

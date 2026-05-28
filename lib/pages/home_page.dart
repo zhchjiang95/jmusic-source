@@ -15,6 +15,7 @@ import 'package:jmusic/widgets/web_remote_sheet.dart';
 import 'package:jmusic/widgets/webdav_sheet.dart';
 import 'package:jmusic/providers/webdav_provider.dart';
 import 'package:jmusic/pages/play_stats_page.dart';
+import 'package:jmusic/pages/listening_report_page.dart';
 
 /// 主页 - 歌曲库列表
 class HomePage extends ConsumerStatefulWidget {
@@ -253,6 +254,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 builder: (_) => const PlayStatsPage(),
                               ),
                             );
+                          case 'report':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ListeningReportPage(),
+                              ),
+                            );
                           case 'remote':
                             WebRemoteSheet.show(context);
                           case 'webdav':
@@ -268,6 +275,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                             leading: Icon(Icons.bar_chart,
                                 color: Colors.white70, size: 20),
                             title: Text('播放统计',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'report',
+                          child: ListTile(
+                            leading: Icon(Icons.auto_awesome,
+                                color: Colors.white70, size: 20),
+                            title: Text('听歌报告',
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 14)),
                             dense: true,

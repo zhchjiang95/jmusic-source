@@ -21,6 +21,9 @@
 - 🎭 **播放页视觉风格** — 三种可选风格：标准渐变 / 封面高斯模糊背景 / 黑胶唱片旋转+粒子效果；点击封面区域切换
 - 🃏 **歌词卡片分享** — 全屏歌词页长按任意歌词行，生成精美分享卡片（封面模糊背景 + 歌词 + 歌曲信息 + 官网二维码），可导出为高清 PNG 图片
 - 📡 **Web 遥控** — 局域网内手机浏览器扫码控制播放（HTTP + WebSocket，端口 9621），支持播放/暂停、切歌、音量、进度拖拽、播放列表选曲
+- 🔁 **A-B 复读循环** — 选段循环播放，适合扒谱/学语言；点击设 A/B 点，进度条高亮区间，到达 B 点自动跳回 A 点，长按清除
+- ✏️ **歌词编辑器** — 手动调时间轴的 LRC 编辑器；边播放边逐行打轴、±100ms 微调、整体时间偏移、导入纯文本/LRC、导出并内嵌到音频文件
+- 📊 **听歌报告** — Spotify Wrapped 风格的听歌统计报告，5 页卡片翻页展示（总览/最爱歌曲/TOP5/歌手排行/总结），支持导出高清 PNG 图片分享
 
 ## 📸 应用截图
 
@@ -43,6 +46,18 @@
 <p align="center">
   <img src="screenshots/menubar-lyrics.png" alt="macOS 菜单栏歌词" width="600" />
 </p>
+
+### A-B 复读 & 歌词编辑器
+
+|             A-B 复读循环              |             歌词编辑器（打轴）              |
+| :-----------------------------------: | :----------------------------------------: |
+| ![A-B复读](screenshots/ab-loop.png) | ![歌词编辑器](screenshots/lyrics-editor.png) |
+
+### 听歌报告
+
+|             报告总览              |             TOP 5 歌曲              |
+| :-------------------------------: | :---------------------------------: |
+| ![报告总览](screenshots/report-overview.png) | ![TOP5](screenshots/report-top5.png) |
 
 ## 🏗️ 技术架构
 
@@ -71,7 +86,9 @@ lib/
 ├── pages/
 │   ├── home_page.dart    # 歌曲库列表
 │   ├── player_page.dart  # 播放页（三种视觉风格）+ 全屏歌词
-│   └── play_stats_page.dart # 播放统计
+│   ├── play_stats_page.dart      # 播放统计
+│   ├── lyrics_editor_page.dart   # 歌词编辑器（LRC 打轴）
+│   └── listening_report_page.dart # 听歌报告（Wrapped 风格）
 ├── services/
 │   ├── web_remote.dart        # Web 遥控 HTTP+WebSocket 服务器
 │   ├── web_remote_html.dart   # 遥控页面内嵌 HTML
