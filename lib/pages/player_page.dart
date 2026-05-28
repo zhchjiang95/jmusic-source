@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/providers/player_style.dart';
+import 'package:jmusic/providers/sleep_timer.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
 import 'package:jmusic/widgets/particles_bg.dart';
+import 'package:jmusic/widgets/sleep_timer_sheet.dart';
 import 'package:jmusic/widgets/spectrum_view.dart';
 import 'package:jmusic/widgets/vinyl_disc.dart';
 
@@ -160,6 +162,25 @@ class PlayerPage extends ConsumerWidget {
             icon: const Icon(Icons.keyboard_arrow_down, size: 32),
           ),
           const Spacer(),
+          // 睡前定时
+          Consumer(
+            builder: (context, ref, _) {
+              final timer = ref.watch(sleepTimerProvider);
+              return IconButton(
+                onPressed: () => SleepTimerSheet.show(context),
+                icon: Icon(
+                  Icons.bedtime_outlined,
+                  color: timer.isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white70,
+                  size: 20,
+                ),
+                tooltip: timer.isActive
+                    ? '定时 ${timer.remainingFormatted}'
+                    : '睡前定时',
+              );
+            },
+          ),
           // 保存信息到文件
           Consumer(
             builder: (context, ref, _) {

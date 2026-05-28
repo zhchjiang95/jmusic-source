@@ -212,6 +212,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         ),
                       ),
                     const SizedBox(width: 8),
+                    // 添加音乐目录（高频操作，保留）
                     IconButton(
                       onPressed: libraryState.isScanning
                           ? null
@@ -232,52 +233,86 @@ class _HomePageState extends ConsumerState<HomePage> {
                             ),
                       tooltip: '添加音乐目录',
                     ),
-                    IconButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const PlayStatsPage(),
-                          ),
-                        );
+                    // 更多菜单
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: theme.colorScheme.primary,
+                        size: 22,
+                      ),
+                      tooltip: '更多',
+                      color: const Color(0xFF2A2A2A),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'stats':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const PlayStatsPage(),
+                              ),
+                            );
+                          case 'remote':
+                            WebRemoteSheet.show(context);
+                          case 'webdav':
+                            WebDavSheet.show(context);
+                          case 'settings':
+                            _showMacosSettingsDialog(context);
+                        }
                       },
-                      icon: Icon(
-                        Icons.bar_chart,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                      tooltip: '播放统计',
-                    ),
-                    // Web 遥控入口
-                    IconButton(
-                      onPressed: () => WebRemoteSheet.show(context),
-                      icon: Icon(
-                        Icons.wifi_tethering,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                      tooltip: 'Web 遥控',
-                    ),
-                    // WebDAV 音乐源
-                    IconButton(
-                      onPressed: () => WebDavSheet.show(context),
-                      icon: Icon(
-                        Icons.cloud_outlined,
-                        color: theme.colorScheme.primary,
-                        size: 20,
-                      ),
-                      tooltip: 'WebDAV 音乐源',
-                    ),
-                    // macOS 端的设置入口：仅在 macOS 显示
-                    if (Platform.isMacOS)
-                      IconButton(
-                        onPressed: () => _showMacosSettingsDialog(context),
-                        icon: Icon(
-                          Icons.settings_outlined,
-                          color: theme.colorScheme.primary,
-                          size: 20,
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'stats',
+                          child: ListTile(
+                            leading: Icon(Icons.bar_chart,
+                                color: Colors.white70, size: 20),
+                            title: Text('播放统计',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                        tooltip: '设置',
-                      ),
+                        const PopupMenuItem(
+                          value: 'remote',
+                          child: ListTile(
+                            leading: Icon(Icons.wifi_tethering,
+                                color: Colors.white70, size: 20),
+                            title: Text('Web 遥控',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'webdav',
+                          child: ListTile(
+                            leading: Icon(Icons.cloud_outlined,
+                                color: Colors.white70, size: 20),
+                            title: Text('WebDAV 音乐源',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        if (Platform.isMacOS)
+                          const PopupMenuItem(
+                            value: 'settings',
+                            child: ListTile(
+                              leading: Icon(Icons.settings_outlined,
+                                  color: Colors.white70, size: 20),
+                              title: Text('设置',
+                                  style: TextStyle(
+                                      color: Colors.white, fontSize: 14)),
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ),
