@@ -186,9 +186,19 @@ flutter build windows
 flutter build linux
 flutter build apk         # 构建 Android APK 包
 flutter build appbundle   # 构建 Google Play 的 AAB 格式包
-# 清缓存构建 Android APK 包
+# 彻底清理缓存并重新构建（当遇到桥接代码哈希值不匹配、Bad state 等报错时使用）
+# 1. 清理 Rust 编译缓存
+cd rust
+cargo clean
+cd ..
+# 2. 清理 Android 构建缓存 (如果本地未配置 Java 环境变量，此步可跳过)
+cd android
+./gradlew clean
+cd ..
+# 3. 清理 Flutter 缓存并重新生成桥接代码（确保在项目根目录下运行）
 flutter clean
 flutter_rust_bridge_codegen generate
+# 4. 重新构建（建议在手机/模拟器上先手动卸载旧版本，防止动态库缓存残留）
 flutter build apk
 ```
 
