@@ -13,6 +13,7 @@ import 'package:jmusic/src/rust/api/media_session.dart' as rust_media_session;
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
 import 'package:jmusic/providers/webdav_provider.dart';
+import 'package:jmusic/services/listening_calendar_service.dart';
 import 'package:jmusic/providers/playback_speed.dart';
 
 /// 播放模式枚举
@@ -142,11 +143,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
     NativeUtils.updateTitle('JMusic');
     // 注册托盘播放控制回调
     _registerTrayHandler();
+    // 加载听歌日历数据
+    ListeningCalendarService.instance.load();
     // 清理定时器
     ref.onDispose(() {
       _positionTimer?.cancel();
       _spectrumTimer?.cancel();
       _mediaEventTimer?.cancel();
+      // 退出时保存听歌日历
+      ListeningCalendarService.instance.save();
       try {
         if (!Platform.isAndroid) {
           rust_player.playerStop();
@@ -427,6 +432,14 @@ class PlayerNotifier extends Notifier<PlayerState> {
           if (tickCount % 10 == 0) {
             _updateMediaSessionPlayback(true, newPos);
           }
+          // 每 30 秒累加听歌日历时长（60 ticks × 500ms = 30s）
+          if (tickCount % 60 == 0) {
+            ListeningCalendarService.instance.addListeningDuration(30);
+          }
+          // 每 5 分钟持久化一次日历数据（600 ticks × 500ms = 5min）
+          if (tickCount % 600 == 0) {
+            ListeningCalendarService.instance.save();
+          }
         }
       }
     });
@@ -569,6 +582,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
         title: song.title,
         artist: song.artist,
       );
+
+      // 记录听歌日历打卡
+      ListeningCalendarService.instance.recordPlay();
 
       // 播放歌曲时更新原生托盘及窗口标题
       NativeUtils.updateTitle('${song.title} - ${song.artist}');

@@ -16,6 +16,7 @@ import 'package:jmusic/widgets/webdav_sheet.dart';
 import 'package:jmusic/providers/webdav_provider.dart';
 import 'package:jmusic/pages/play_stats_page.dart';
 import 'package:jmusic/pages/listening_report_page.dart';
+import 'package:jmusic/pages/listening_calendar_page.dart';
 
 /// 主页 - 歌曲库列表
 class HomePage extends ConsumerStatefulWidget {
@@ -260,6 +261,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 builder: (_) => const ListeningReportPage(),
                               ),
                             );
+                          case 'calendar':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const ListeningCalendarPage(),
+                              ),
+                            );
                           case 'remote':
                             WebRemoteSheet.show(context);
                           case 'webdav':
@@ -287,6 +294,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                             leading: Icon(Icons.auto_awesome,
                                 color: Colors.white70, size: 20),
                             title: Text('听歌报告',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'calendar',
+                          child: ListTile(
+                            leading: Icon(Icons.calendar_month,
+                                color: Colors.white70, size: 20),
+                            title: Text('听歌日历',
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 14)),
                             dense: true,
