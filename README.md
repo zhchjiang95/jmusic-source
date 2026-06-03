@@ -24,6 +24,9 @@
 - 🔁 **A-B 复读循环** — 选段循环播放，适合扒谱/学语言；点击设 A/B 点，进度条高亮区间，到达 B 点自动跳回 A 点，长按清除
 - ✏️ **歌词编辑器** — 手动调时间轴的 LRC 编辑器；边播放边逐行打轴、±100ms 微调、整体时间偏移、导入纯文本/LRC、导出并内嵌到音频文件
 - 📊 **听歌报告** — Spotify Wrapped 风格的听歌统计报告，5 页卡片翻页展示（总览/最爱歌曲/TOP5/歌手排行/总结），支持导出高清 PNG 图片分享
+- 📺 **DLNA 投放** — SSDP 自动发现局域网智能音箱/电视，UPnP 推流播放，支持播放控制、进度同步、音量调节
+- 📅 **听歌打卡日历** — GitHub 贡献图风格热力图，记录每日听歌时长，显示连续打卡天数和最近 7 天详情
+- 🏷️ **自定义标签** — 给歌曲打标签（"开车"、"工作"、"清晨"等），搜索框下方横向 Chips 快速多标签筛选，筛选结果自动同步播放列表
 
 ## 📸 应用截图
 
@@ -94,11 +97,16 @@ lib/
 │   ├── player_page.dart  # 播放页（三种视觉风格）+ 全屏歌词
 │   ├── play_stats_page.dart      # 播放统计
 │   ├── lyrics_editor_page.dart   # 歌词编辑器（LRC 打轴）
-│   └── listening_report_page.dart # 听歌报告（Wrapped 风格）
+│   ├── listening_report_page.dart # 听歌报告（Wrapped 风格）
+│   └── listening_calendar_page.dart # 听歌打卡日历（GitHub 贡献图风）
 ├── services/
 │   ├── web_remote.dart        # Web 遥控 HTTP+WebSocket 服务器
 │   ├── web_remote_html.dart   # 遥控页面内嵌 HTML
-│   └── webdav_service.dart    # WebDAV 协议通信（列目录/下载/缓存）
+│   ├── webdav_service.dart    # WebDAV 协议通信（列目录/下载/缓存）
+│   ├── dlna_service.dart      # DLNA 设备发现（SSDP）+ UPnP 控制（SOAP）
+│   ├── media_stream_server.dart   # 本地 HTTP 媒体流服务器（为 DLNA 设备提供音频）
+│   ├── listening_calendar_service.dart # 听歌日历数据持久化
+│   └── song_tag_service.dart  # 歌曲标签管理与持久化
 ├── widgets/
 │   ├── mini_player.dart       # 底部迷你播放栏
 │   ├── lyrics_view.dart       # 歌词滚动组件（支持长按分享）
@@ -109,7 +117,9 @@ lib/
 │   ├── web_remote_sheet.dart  # Web 遥控管理面板
 │   ├── webdav_sheet.dart      # WebDAV 音乐源管理面板
 │   ├── sleep_timer_sheet.dart # 睡前定时器面板
-│   └── speed_control_sheet.dart # 变速控制面板
+│   ├── speed_control_sheet.dart # 变速控制面板
+│   ├── cast_sheet.dart        # DLNA 投放设备选择面板
+│   └── song_tag_sheet.dart    # 歌曲标签编辑面板
 └── providers/
     ├── app_providers.dart      # Riverpod 状态管理（播放器+歌曲库）
     ├── spectrum.dart           # 频谱常量
@@ -119,6 +129,8 @@ lib/
     ├── sleep_timer.dart        # 睡前定时器
     ├── web_remote_provider.dart # Web 遥控服务状态
     ├── webdav_provider.dart    # WebDAV 音乐源状态
+    ├── cast_provider.dart      # DLNA 投放状态管理
+    ├── song_tag_provider.dart  # 歌曲标签筛选状态
     └── macos_status_bar.dart   # macOS 菜单栏歌词控制器
 ```
 

@@ -14,6 +14,8 @@ import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/src/rust/models/lyrics.dart';
 import 'package:jmusic/providers/webdav_provider.dart';
 import 'package:jmusic/services/listening_calendar_service.dart';
+import 'package:jmusic/services/play_history_service.dart';
+import 'package:jmusic/services/achievement_service.dart';
 import 'package:jmusic/providers/playback_speed.dart';
 
 /// 播放模式枚举
@@ -59,6 +61,7 @@ class PlayerState {
   final ABLoopState abLoopState; // A-B 复读状态
   final Duration? loopStart; // A 点
   final Duration? loopEnd; // B 点
+  final List<Song> queue; // 播放队列（优先于 playlist 的临时队列）
 
   const PlayerState({
     this.currentSong,
@@ -78,6 +81,7 @@ class PlayerState {
     this.abLoopState = ABLoopState.off,
     this.loopStart,
     this.loopEnd,
+    this.queue = const [],
   });
 
   PlayerState copyWith({
@@ -98,6 +102,7 @@ class PlayerState {
     ABLoopState? abLoopState,
     Duration? loopStart,
     Duration? loopEnd,
+    List<Song>? queue,
     bool clearLyrics = false,
     bool clearCover = false,
     bool clearSong = false,
@@ -122,6 +127,7 @@ class PlayerState {
       abLoopState: clearLoop ? ABLoopState.off : (abLoopState ?? this.abLoopState),
       loopStart: clearLoop ? null : (loopStart ?? this.loopStart),
       loopEnd: clearLoop ? null : (loopEnd ?? this.loopEnd),
+      queue: queue ?? this.queue,
     );
   }
 }
@@ -145,6 +151,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
     _registerTrayHandler();
     // 加载听歌日历数据
     ListeningCalendarService.instance.load();
+    // 加载播放历史数据
+    PlayHistoryService.instance.load();
+    // 加载成就数据
+    AchievementService.instance.load();
     // 清理定时器
     ref.onDispose(() {
       _positionTimer?.cancel();
@@ -586,6 +596,19 @@ class PlayerNotifier extends Notifier<PlayerState> {
       // 记录听歌日历打卡
       ListeningCalendarService.instance.recordPlay();
 
+      // 记录播放历史
+      PlayHistoryService.instance.recordPlay(
+        filePath: song.filePath,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        duration: song.duration,
+      );
+      PlayHistoryService.instance.save();
+
+      // 检查成就解锁
+      AchievementService.instance.checkAndUnlock();
+
       // 播放歌曲时更新原生托盘及窗口标题
       NativeUtils.updateTitle('${song.title} - ${song.artist}');
 
@@ -740,7 +763,16 @@ class PlayerNotifier extends Notifier<PlayerState> {
 
   /// 下一首
   void next() {
-    if (state.playlist.isEmpty) return;
+    if (state.playlist.isEmpty && state.queue.isEmpty) return;
+
+    // 队列优先：如果有播放队列，从队列头部取出播放
+    if (state.queue.isNotEmpty) {
+      final nextSong = state.queue.first;
+      final remaining = List<Song>.from(state.queue)..removeAt(0);
+      state = state.copyWith(queue: remaining);
+      _playFile(nextSong);
+      return;
+    }
 
     if (state.currentSong == null) {
       _playRandom();
@@ -858,6 +890,46 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 清除 A-B 循环
   void clearABLoop() {
     state = state.copyWith(clearLoop: true);
+  }
+
+  // ─── 播放队列管理 ─────────────────────────────────────────────────────
+
+  /// 下一首播放（插入队列头部）
+  void playNextInQueue(Song song) {
+    final queue = List<Song>.from(state.queue);
+    queue.insert(0, song);
+    state = state.copyWith(queue: queue);
+  }
+
+  /// 添加到队列末尾
+  void addToQueue(Song song) {
+    final queue = List<Song>.from(state.queue)..add(song);
+    state = state.copyWith(queue: queue);
+  }
+
+  /// 从队列中移除指定位置
+  void removeFromQueue(int index) {
+    if (index < 0 || index >= state.queue.length) return;
+    final queue = List<Song>.from(state.queue)..removeAt(index);
+    state = state.copyWith(queue: queue);
+  }
+
+  /// 清空播放队列
+  void clearQueue() {
+    state = state.copyWith(queue: []);
+  }
+
+  // ─── 播放历史 ─────────────────────────────────────────────────────────
+
+  /// 获取最近播放历史
+  List<PlayHistoryEntry> getPlayHistory() {
+    return PlayHistoryService.instance.entries;
+  }
+
+  /// 清除播放历史
+  void clearPlayHistory() {
+    PlayHistoryService.instance.clear();
+    PlayHistoryService.instance.save();
   }
 
   /// 更新当前播放歌曲的元数据和歌词（主要用于导入歌词后的实时同步）

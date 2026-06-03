@@ -17,6 +17,8 @@ import 'package:jmusic/providers/webdav_provider.dart';
 import 'package:jmusic/pages/play_stats_page.dart';
 import 'package:jmusic/pages/listening_report_page.dart';
 import 'package:jmusic/pages/listening_calendar_page.dart';
+import 'package:jmusic/pages/queue_history_page.dart';
+import 'package:jmusic/pages/achievements_page.dart';
 import 'package:jmusic/providers/song_tag_provider.dart';
 import 'package:jmusic/widgets/song_tag_sheet.dart';
 
@@ -281,6 +283,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                       onSelected: (value) {
                         switch (value) {
+                          case 'queue':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const QueueHistoryPage(),
+                              ),
+                            );
                           case 'stats':
                             Navigator.of(context).push(
                               MaterialPageRoute(
@@ -299,6 +307,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                                 builder: (_) => const ListeningCalendarPage(),
                               ),
                             );
+                          case 'achievements':
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AchievementsPage(),
+                              ),
+                            );
                           case 'remote':
                             WebRemoteSheet.show(context);
                           case 'webdav':
@@ -308,6 +322,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                         }
                       },
                       itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'queue',
+                          child: ListTile(
+                            leading: Icon(Icons.queue_music_rounded,
+                                color: Colors.white70, size: 20),
+                            title: Text('队列与历史',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
                         const PopupMenuItem(
                           value: 'stats',
                           child: ListTile(
@@ -338,6 +364,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                             leading: Icon(Icons.calendar_month,
                                 color: Colors.white70, size: 20),
                             title: Text('听歌日历',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'achievements',
+                          child: ListTile(
+                            leading: Icon(Icons.emoji_events_outlined,
+                                color: Colors.white70, size: 20),
+                            title: Text('听歌成就',
                                 style: TextStyle(
                                     color: Colors.white, fontSize: 14)),
                             dense: true,
@@ -975,6 +1013,29 @@ class _HomePageState extends ConsumerState<HomePage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
         PopupMenuItem(
+          value: 'play_next',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.playlist_play_rounded, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('下一首播放', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'add_queue',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(Icons.playlist_add_rounded, size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              const Text('添加到队列', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(height: 8),
+        PopupMenuItem(
           value: 'info',
           height: 36,
           child: Row(
@@ -1047,7 +1108,23 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ],
     ).then((value) {
-      if (value == 'info') {
+      if (value == 'play_next') {
+        ref.read(playerProvider.notifier).playNextInQueue(song);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('下一首播放: ${song.title}'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else if (value == 'add_queue') {
+        ref.read(playerProvider.notifier).addToQueue(song);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已添加到队列: ${song.title}'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      } else if (value == 'info') {
         _showSongInfoDialog(context, ref, song);
       } else if (value == 'edit') {
         _showEditDialog(context, ref, song);
