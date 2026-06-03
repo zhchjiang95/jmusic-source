@@ -12,10 +12,12 @@ import 'package:jmusic/providers/sleep_timer.dart';
 import 'package:jmusic/pages/lyrics_editor_page.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
 import 'package:jmusic/widgets/particles_bg.dart';
+import 'package:jmusic/widgets/cast_sheet.dart';
 import 'package:jmusic/widgets/sleep_timer_sheet.dart';
 import 'package:jmusic/widgets/speed_control_sheet.dart';
 import 'package:jmusic/widgets/spectrum_view.dart';
 import 'package:jmusic/widgets/vinyl_disc.dart';
+import 'package:jmusic/providers/cast_provider.dart';
 
 /// 全屏播放页面
 class PlayerPage extends ConsumerWidget {
@@ -190,6 +192,25 @@ class PlayerPage extends ConsumerWidget {
             icon: const Icon(Icons.keyboard_arrow_down, size: 32),
           ),
           const Spacer(),
+          // DLNA 投放按钮
+          Consumer(
+            builder: (context, ref, _) {
+              final isCasting = ref.watch(
+                castProvider.select((s) => s.isCasting),
+              );
+              return IconButton(
+                onPressed: () => showCastSheet(context),
+                icon: Icon(
+                  isCasting ? Icons.cast_connected_rounded : Icons.cast_rounded,
+                  color: isCasting
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.white70,
+                  size: 21,
+                ),
+                tooltip: isCasting ? '正在投放' : '投放到设备',
+              );
+            },
+          ),
           // 睡前定时
           Consumer(
             builder: (context, ref, _) {

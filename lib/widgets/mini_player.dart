@@ -2,7 +2,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/providers/cast_provider.dart';
 import 'package:jmusic/pages/player_page.dart';
+import 'package:jmusic/widgets/cast_sheet.dart';
 
 /// 底部迷你播放栏
 class MiniPlayer extends ConsumerWidget {
@@ -158,6 +160,31 @@ class MiniPlayer extends ConsumerWidget {
                         ),
                       ],
                     ),
+                  ),
+                  // DLNA 投放按钮
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final isCasting = ref.watch(
+                        castProvider.select((s) => s.isCasting),
+                      );
+                      return IconButton(
+                        onPressed: () => showCastSheet(context),
+                        icon: Icon(
+                          isCasting
+                              ? Icons.cast_connected_rounded
+                              : Icons.cast_rounded,
+                          color: isCasting
+                              ? theme.colorScheme.primary
+                              : Colors.white54,
+                          size: 20,
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 32,
+                          minHeight: 32,
+                        ),
+                      );
+                    },
                   ),
                   // 播放/暂停按钮
                   IconButton(
