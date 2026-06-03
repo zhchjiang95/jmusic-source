@@ -17,6 +17,8 @@ import 'package:jmusic/providers/webdav_provider.dart';
 import 'package:jmusic/pages/play_stats_page.dart';
 import 'package:jmusic/pages/listening_report_page.dart';
 import 'package:jmusic/pages/listening_calendar_page.dart';
+import 'package:jmusic/providers/song_tag_provider.dart';
+import 'package:jmusic/widgets/song_tag_sheet.dart';
 
 /// 主页 - 歌曲库列表
 class HomePage extends ConsumerStatefulWidget {
@@ -101,16 +103,32 @@ class _HomePageState extends ConsumerState<HomePage> {
       ...ref.read(libraryProvider).songs,
       ...ref.read(webDavProvider).songs,
     ];
-    if (_searchQuery.isEmpty) return songs;
-    final q = _searchQuery.toLowerCase();
-    return songs
-        .where(
-          (s) =>
-              s.title.toLowerCase().contains(q) ||
-              s.artist.toLowerCase().contains(q) ||
-              s.album.toLowerCase().contains(q),
-        )
-        .toList();
+
+    // 标签筛选
+    final tagState = ref.read(songTagProvider);
+    List<Song> filtered = songs;
+    if (tagState.selectedTags.isNotEmpty) {
+      final matchedPaths =
+          ref.read(songTagProvider.notifier).getFilteredPaths();
+      filtered = filtered
+          .where((s) => matchedPaths.contains(s.filePath))
+          .toList();
+    }
+
+    // 文本搜索
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      filtered = filtered
+          .where(
+            (s) =>
+                s.title.toLowerCase().contains(q) ||
+                s.artist.toLowerCase().contains(q) ||
+                s.album.toLowerCase().contains(q),
+          )
+          .toList();
+    }
+
+    return filtered;
   }
 
   /// 更新搜索关键词，并把过滤后的列表同步给播放器，
@@ -139,6 +157,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final libraryState = ref.watch(libraryProvider);
     final webDavState = ref.watch(webDavProvider);
     final playerState = ref.watch(playerProvider);
+    final tagState = ref.watch(songTagProvider);
     final theme = Theme.of(context);
 
     // 合并本地 + WebDAV 歌曲
@@ -158,15 +177,28 @@ class _HomePageState extends ConsumerState<HomePage> {
       }
     });
 
-    // 根据搜索关键词过滤歌曲
-    final filteredSongs = _searchQuery.isEmpty
-        ? allSongs
-        : allSongs.where((song) {
-            final q = _searchQuery.toLowerCase();
-            return song.title.toLowerCase().contains(q) ||
-                song.artist.toLowerCase().contains(q) ||
-                song.album.toLowerCase().contains(q);
-          }).toList();
+    // 根据标签 + 搜索关键词过滤歌曲
+    List<Song> filteredSongs = allSongs;
+
+    // 标签筛选
+    if (tagState.selectedTags.isNotEmpty) {
+      final matchedPaths =
+          ref.read(songTagProvider.notifier).getFilteredPaths();
+      filteredSongs = filteredSongs
+          .where((s) => matchedPaths.contains(s.filePath))
+          .toList();
+    }
+
+    // 文本搜索
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      filteredSongs = filteredSongs
+          .where((song) =>
+              song.title.toLowerCase().contains(q) ||
+              song.artist.toLowerCase().contains(q) ||
+              song.album.toLowerCase().contains(q))
+          .toList();
+    }
 
     return Scaffold(
         body: SafeArea(
@@ -421,6 +453,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                 ),
 
+              // 标签筛选栏
+              _buildTagFilterBar(theme),
+
               // 歌曲列表
               Expanded(
                 child: Stack(
@@ -456,6 +491,84 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       );
+  }
+
+  /// 标签筛选栏
+  Widget _buildTagFilterBar(ThemeData theme) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final tagState = ref.watch(songTagProvider);
+        if (tagState.allTags.isEmpty) return const SizedBox.shrink();
+
+        return SizedBox(
+          height: 36,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 16, bottom: 4),
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                // 清除筛选按钮（选中标签时显示）
+                if (tagState.selectedTags.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ActionChip(
+                      avatar: const Icon(Icons.close, size: 14, color: Colors.white54),
+                      label: const Text('清除',
+                          style: TextStyle(color: Colors.white54, fontSize: 11)),
+                      backgroundColor: Colors.white.withValues(alpha: 0.08),
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      onPressed: () {
+                        ref.read(songTagProvider.notifier).clearFilter();
+                        ref.read(playerProvider.notifier).setPlaylist(_getFilteredSongs());
+                      },
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                  ),
+                // 标签 Chips
+                ...tagState.allTags.map((tag) {
+                  final isSelected = tagState.selectedTags.contains(tag);
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: FilterChip(
+                      label: Text(
+                        tag,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.white60,
+                          fontSize: 11,
+                        ),
+                      ),
+                      selected: isSelected,
+                      selectedColor:
+                          theme.colorScheme.primary.withValues(alpha: 0.3),
+                      backgroundColor: Colors.white.withValues(alpha: 0.06),
+                      side: BorderSide(
+                        color: isSelected
+                            ? theme.colorScheme.primary.withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.1),
+                      ),
+                      checkmarkColor: theme.colorScheme.primary,
+                      showCheckmark: false,
+                      onSelected: (_) {
+                        ref.read(songTagProvider.notifier).toggleTag(tag);
+                        // 切换标签后同步播放列表
+                        Future.microtask(() {
+                          ref.read(playerProvider.notifier).setPlaylist(_getFilteredSongs());
+                        });
+                      },
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// 悬浮定位按钮（中心实心圆 + 外圆环）
@@ -917,6 +1030,21 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
+        PopupMenuItem(
+          value: 'tags',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(
+                Icons.label_outline_rounded,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              const Text('标签管理', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
       ],
     ).then((value) {
       if (value == 'info') {
@@ -927,6 +1055,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         _showImportLyricsDialog(context, ref, song);
       } else if (value == 'edit_cover') {
         _showEditCoverDialog(context, ref, song);
+      } else if (value == 'tags') {
+        SongTagSheet.show(context, song.filePath, song.title);
       }
     });
   }
