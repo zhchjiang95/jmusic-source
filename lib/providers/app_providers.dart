@@ -159,21 +159,33 @@ class PlayerNotifier extends Notifier<PlayerState> {
   /// 启动频谱轮询定时器
   void _startSpectrumTimer() {
     _spectrumTimer?.cancel();
-    _spectrumTimer = Timer.periodic(kSpectrumPollInterval, (_) {
+    _spectrumTimer = Timer.periodic(kSpectrumPollInterval, (_) async {
       if (!state.isPlaying) return;
       try {
-        final frame = rust_player.playerGetSpectrum();
-        if (frame == null) return;
-        // 防御性归一化
-        final List<double> safe;
-        if (frame.length == kSpectrumBins) {
-          safe = List<double>.generate(
-              kSpectrumBins, (i) => frame[i].clamp(0.0, 1.0));
+        if (Platform.isAndroid) {
+          // Android: 从原生 Visualizer 获取频谱数据
+          final result = await _playerChannel.invokeMethod('getSpectrum');
+          if (result == null) return;
+          final List<dynamic> raw = result;
+          final List<double> safe = List<double>.generate(
+            kSpectrumBins,
+            (i) => i < raw.length ? (raw[i] as num).toDouble().clamp(0.0, 1.0) : 0.0,
+          );
+          state = state.copyWith(spectrum: safe);
         } else {
-          safe = List<double>.generate(kSpectrumBins,
-              (i) => i < frame.length ? frame[i].toDouble().clamp(0.0, 1.0) : 0.0);
+          // 桌面端：从 Rust 引擎获取频谱数据
+          final frame = rust_player.playerGetSpectrum();
+          if (frame == null) return;
+          final List<double> safe;
+          if (frame.length == kSpectrumBins) {
+            safe = List<double>.generate(
+                kSpectrumBins, (i) => frame[i].clamp(0.0, 1.0));
+          } else {
+            safe = List<double>.generate(kSpectrumBins,
+                (i) => i < frame.length ? frame[i].toDouble().clamp(0.0, 1.0) : 0.0);
+          }
+          state = state.copyWith(spectrum: safe);
         }
-        state = state.copyWith(spectrum: safe);
       } catch (_) {}
     });
   }

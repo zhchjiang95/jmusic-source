@@ -5,11 +5,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -81,6 +84,8 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "play" -> {
                     try {
+                        // 确保麦克风权限（Visualizer 需要）
+                        ensureRecordAudioPermission()
                         // 确保服务以 startService 方式启动（startForeground 需要）
                         val svcIntent = Intent(this@MainActivity, MusicService::class.java)
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -123,6 +128,14 @@ class MainActivity : FlutterActivity() {
                 "isPlaying" -> {
                     result.success(musicService?.isPlaying() ?: false)
                 }
+                "getSpectrum" -> {
+                    val spectrum = musicService?.getSpectrum()
+                    if (spectrum != null) {
+                        result.success(spectrum.toList())
+                    } else {
+                        result.success(null)
+                    }
+                }
                 "updateMetadata" -> {
                     // 参数格式: "title\nartist\nalbum\ndurationSecs"
                     val parts = arg.split("\n")
@@ -149,6 +162,18 @@ class MainActivity : FlutterActivity() {
     }
 
     // --- 权限相关 ---
+
+    private fun ensureRecordAudioPermission() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(android.Manifest.permission.RECORD_AUDIO),
+                1002
+            )
+        }
+    }
 
     private fun hasStoragePermission(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

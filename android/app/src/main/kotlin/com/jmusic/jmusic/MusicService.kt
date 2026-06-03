@@ -7,14 +7,19 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.media.MediaPlayer
+import android.media.audiofx.Visualizer
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.media.session.MediaButtonReceiver
+import kotlin.math.ln
+import kotlin.math.max
+import kotlin.math.sqrt
 
 class MusicService : Service() {
 
@@ -30,6 +35,14 @@ class MusicService : Service() {
     private var currentAlbum: String = ""
     private var durationMs: Long = 0
     private var isForeground: Boolean = false
+
+    // 频谱分析器
+    private var visualizer: Visualizer? = null
+    private val NUM_BINS = 64
+    @Volatile
+    private var spectrumData: FloatArray = FloatArray(NUM_BINS)
+    private val DB_FLOOR = -60.0f
+    private val DB_CEIL = 0.0f
 
     // 回调接口，用于通知 Flutter 端
     var onMediaAction: ((String) -> Unit)? = null
@@ -58,6 +71,7 @@ class MusicService : Service() {
     }
 
     override fun onDestroy() {
+        releaseVisualizer()
         mediaPlayer?.release()
         mediaPlayer = null
         mediaSession.release()
@@ -126,6 +140,7 @@ class MusicService : Service() {
             start()
             durationMs = duration.toLong()
         }
+        startVisualizer()
         updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
         showNotification()
     }
@@ -143,6 +158,7 @@ class MusicService : Service() {
     }
 
     fun stop() {
+        releaseVisualizer()
         mediaPlayer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
@@ -169,6 +185,118 @@ class MusicService : Service() {
     fun getCurrentPosition(): Int = mediaPlayer?.currentPosition ?: 0
 
     fun isPlaying(): Boolean = mediaPlayer?.isPlaying ?: false
+
+    /**
+     * 获取当前 64-bin 归一化频谱数据 (0.0~1.0)
+     */
+    fun getSpectrum(): FloatArray = spectrumData
+
+    /**
+     * 启动 Visualizer，绑定到 MediaPlayer 的 audio session
+     */
+    private fun startVisualizer() {
+        releaseVisualizer()
+        val player = mediaPlayer ?: return
+        try {
+            val sessionId = player.audioSessionId
+            visualizer = Visualizer(sessionId).apply {
+                // 设置采集大小（必须是 2 的幂，范围 128~1024）
+                val capSize = Visualizer.getCaptureSizeRange()
+                val desiredSize = 1024 // 足够做 64-bin 对数分箱
+                captureSize = desiredSize.coerceIn(capSize[0], capSize[1])
+
+                setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
+                    override fun onWaveFormDataCapture(
+                        visualizer: Visualizer?,
+                        waveform: ByteArray?,
+                        samplingRate: Int
+                    ) {
+                        // 不使用波形数据
+                    }
+
+                    override fun onFftDataCapture(
+                        visualizer: Visualizer?,
+                        fft: ByteArray?,
+                        samplingRate: Int
+                    ) {
+                        if (fft == null || fft.size < 4) return
+                        processFFT(fft, samplingRate)
+                    }
+                }, Visualizer.getMaxCaptureRate(), false, true)
+
+                enabled = true
+            }
+        } catch (e: Exception) {
+            Log.w("MusicService", "Visualizer 初始化失败: ${e.message}")
+            visualizer = null
+        }
+    }
+
+    /**
+     * 将 Android Visualizer 的 FFT 字节数据转换为 64-bin 对数频谱
+     *
+     * Android Visualizer FFT 格式:
+     * - fft[0] = DC component (real)
+     * - fft[1] = Nyquist component (real)
+     * - fft[2k], fft[2k+1] = real, imaginary for bin k (k >= 1)
+     */
+    private fun processFFT(fft: ByteArray, samplingRate: Int) {
+        val n = fft.size / 2 // FFT bin 数量
+        if (n < 2) return
+
+        val sampleRate = samplingRate / 1000.0f // Android 传入的是 milliHz，转 Hz
+        val binFreqWidth = sampleRate / (n * 2) // 每个 FFT bin 对应的频率宽度
+
+        // 对数分箱：20Hz ~ Nyquist
+        val minFreq = 20.0f
+        val maxFreq = sampleRate / 2.0f
+        val logMin = ln(minFreq.toDouble()).toFloat()
+        val logMax = ln(maxFreq.toDouble()).toFloat()
+
+        val output = FloatArray(NUM_BINS)
+
+        for (b in 0 until NUM_BINS) {
+            val freqLo = Math.exp((logMin + (logMax - logMin) * b / NUM_BINS).toDouble()).toFloat()
+            val freqHi = Math.exp((logMin + (logMax - logMin) * (b + 1) / NUM_BINS).toDouble()).toFloat()
+
+            val binLo = max(1, (freqLo / binFreqWidth).toInt())
+            val binHi = max(binLo, minOf((freqHi / binFreqWidth).toInt(), n - 1))
+
+            var sum = 0.0f
+            var count = 0
+            for (k in binLo..binHi) {
+                val real = fft[2 * k].toFloat()
+                val imag = fft[2 * k + 1].toFloat()
+                val magnitude = sqrt(real * real + imag * imag)
+                sum += magnitude
+                count++
+            }
+
+            if (count > 0) {
+                val avg = sum / count
+                // dB 归一化
+                val db = (20.0f * Math.log10((avg + 1e-9f).toDouble())).toFloat()
+                val clamped = db.coerceIn(DB_FLOOR, DB_CEIL)
+                output[b] = (clamped - DB_FLOOR) / (DB_CEIL - DB_FLOOR)
+            } else {
+                output[b] = 0.0f
+            }
+        }
+
+        spectrumData = output
+    }
+
+    /**
+     * 释放 Visualizer 资源
+     */
+    private fun releaseVisualizer() {
+        try {
+            visualizer?.enabled = false
+            visualizer?.release()
+        } catch (_: Exception) {}
+        visualizer = null
+        spectrumData = FloatArray(NUM_BINS)
+    }
 
     // --- 元数据更新 ---
 
