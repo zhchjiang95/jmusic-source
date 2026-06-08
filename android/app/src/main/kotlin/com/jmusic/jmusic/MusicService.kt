@@ -274,8 +274,11 @@ class MusicService : Service() {
 
             if (count > 0) {
                 val avg = sum / count
+                // 将字节幅度归一化到 0~1（FFT 实/虚部为有符号字节，最大幅度约 128*sqrt(2)）
+                // 否则 20*log10(avg) 几乎总是 >= 0 dB，被钳到上限导致所有柱条撑满高度
+                val norm = avg / 128.0f
                 // dB 归一化
-                val db = (20.0f * Math.log10((avg + 1e-9f).toDouble())).toFloat()
+                val db = (20.0f * Math.log10((norm + 1e-9f).toDouble())).toFloat()
                 val clamped = db.coerceIn(DB_FLOOR, DB_CEIL)
                 output[b] = (clamped - DB_FLOOR) / (DB_CEIL - DB_FLOOR)
             } else {

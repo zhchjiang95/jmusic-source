@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -893,8 +892,7 @@ class _FullScreenLyricsPage extends ConsumerWidget {
               child: Stack(
                 children: [
                   // 频谱背景（低不透明度 + 径向遮罩）
-                  if (!Platform.isAndroid)
-                    Positioned.fill(
+                  Positioned.fill(
                       child: IgnorePointer(
                         child: ShaderMask(
                           blendMode: BlendMode.dstIn,
