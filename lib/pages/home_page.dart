@@ -22,6 +22,9 @@ import 'package:jmusic/pages/achievements_page.dart';
 import 'package:jmusic/providers/song_tag_provider.dart';
 import 'package:jmusic/widgets/song_tag_sheet.dart';
 import 'package:jmusic/widgets/export_dialog.dart';
+import 'package:jmusic/widgets/album_grid_view.dart';
+import 'package:jmusic/widgets/artist_grid_view.dart';
+
 
 /// 主页 - 歌曲库列表
 class HomePage extends ConsumerStatefulWidget {
@@ -36,6 +39,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   String _searchQuery = '';
+  int _currentViewIndex = 0; // 0: 单曲, 1: 专辑, 2: 歌手
+
 
   @override
   void initState() {
@@ -492,24 +497,28 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                 ),
 
-              // 标签筛选栏
-              _buildTagFilterBar(theme),
+              // 视图切换器
+              if (allSongs.isNotEmpty) _buildViewSelector(theme),
 
-              // 歌曲列表
+              // 标签筛选栏 (仅在单曲视图下显示)
+              if (allSongs.isNotEmpty && _currentViewIndex == 0)
+                _buildTagFilterBar(theme),
+
+              // 列表显示区域
               Expanded(
                 child: Stack(
                   children: [
                     allSongs.isEmpty
                         ? _buildEmptyState(context, ref, libraryState)
-                        : _buildSongList(
+                        : _buildCurrentView(
                             context,
                             ref,
                             filteredSongs,
                             libraryState,
                             playerState,
                           ),
-                    // 悬浮定位按钮（右下角）
-                    if (playerState.currentSong != null)
+                    // 悬浮定位按钮（右下角，仅在单曲视图下显示）
+                    if (playerState.currentSong != null && _currentViewIndex == 0)
                       Positioned(
                         right: 16,
                         bottom: 16,
@@ -531,6 +540,82 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       );
   }
+
+  /// 视图切换胶囊
+  Widget _buildViewSelector(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          _buildSelectorTab(0, '单曲', theme),
+          const SizedBox(width: 8),
+          _buildSelectorTab(1, '专辑', theme),
+          const SizedBox(width: 8),
+          _buildSelectorTab(2, '歌手', theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectorTab(int index, String label, ThemeData theme) {
+    final isSelected = _currentViewIndex == index;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _currentViewIndex = index;
+        });
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primary.withValues(alpha: 0.15)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                : Colors.white12,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+            color: isSelected ? theme.colorScheme.primary : Colors.white70,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 根据当前选中的标签渲染视图
+  Widget _buildCurrentView(
+    BuildContext context,
+    WidgetRef ref,
+    List<Song> filteredSongs,
+    LibraryState libraryState,
+    PlayerState playerState,
+  ) {
+    switch (_currentViewIndex) {
+      case 1:
+        return AlbumGridView(searchQuery: _searchQuery);
+      case 2:
+        return ArtistGridView(searchQuery: _searchQuery);
+      case 0:
+      default:
+        return _buildSongList(
+          context,
+          ref,
+          filteredSongs,
+          libraryState,
+          playerState,
+        );
+    }
+  }
+
 
   /// 标签筛选栏
   Widget _buildTagFilterBar(ThemeData theme) {

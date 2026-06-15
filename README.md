@@ -28,6 +28,7 @@
 - 📅 **听歌打卡日历** — GitHub 贡献图风格热力图，记录每日听歌时长，显示连续打卡天数和最近 7 天详情
 - 🏷️ **自定义标签** — 给歌曲打标签（"开车"、"工作"、"清晨"等），搜索框下方横向 Chips 快速多标签筛选，筛选结果自动同步播放列表
 - 🔄 **音频格式转换** — 支持右键本地/云端 WebDAV 歌曲，一键转码并导出为 MP3 / FLAC / WAV 格式；配备精美的主题配色彩卡单选、下载与转码状态加载提示，转码过程在 Rust 端通过纯 Rust 依赖的独立线程在后台执行，不卡顿 UI，成功后支持在系统文件管理器中一键高亮定位。
+- 💿 **专辑与艺术家视图** — 高性能的封面网格展现与歌手分组浏览。基于本地提取并持久化缓存音频嵌入封面，对大图进行降采样解码限制，零卡顿加载；歌手头像采用拼贴画及生成式哈希渐变色文字头像，完美实现 100% 离线覆盖与现代化高档美感。
 
 ## 📸 应用截图
 
@@ -107,7 +108,8 @@ lib/
 │   ├── dlna_service.dart      # DLNA 设备发现（SSDP）+ UPnP 控制（SOAP）
 │   ├── media_stream_server.dart   # 本地 HTTP 媒体流服务器（为 DLNA 设备提供音频）
 │   ├── listening_calendar_service.dart # 听歌日历数据持久化
-│   └── song_tag_service.dart  # 歌曲标签管理与持久化
+│   ├── song_tag_service.dart  # 歌曲标签管理与持久化
+│   └── cover_cache_service.dart # 音频嵌入封面提取与本地文件缓存服务
 ├── widgets/
 │   ├── mini_player.dart       # 底部迷你播放栏
 │   ├── lyrics_view.dart       # 歌词滚动组件（支持长按分享）
@@ -121,7 +123,9 @@ lib/
 │   ├── speed_control_sheet.dart # 变速控制面板
 │   ├── cast_sheet.dart        # DLNA 投放设备选择面板
 │   ├── song_tag_sheet.dart    # 歌曲标签编辑面板
-│   └── export_dialog.dart     # 音频转码导出对话框
+│   ├── export_dialog.dart     # 音频转码导出对话框
+│   ├── album_grid_view.dart   # 专辑网格及详情半屏弹窗
+│   └── artist_grid_view.dart  # 艺术家网格、拼贴与渐变头像及详情半屏
 └── providers/
     ├── app_providers.dart      # Riverpod 状态管理（播放器+歌曲库）
     ├── spectrum.dart           # 频谱常量
@@ -133,7 +137,8 @@ lib/
     ├── webdav_provider.dart    # WebDAV 音乐源状态
     ├── cast_provider.dart      # DLNA 投放状态管理
     ├── song_tag_provider.dart  # 歌曲标签筛选状态
-    └── macos_status_bar.dart   # macOS 菜单栏歌词控制器
+    ├── macos_status_bar.dart   # macOS 菜单栏歌词控制器
+    └── library_views_provider.dart # 专辑与艺术家内存聚类分组 Provider
 ```
 
 ### macOS 原生模块
