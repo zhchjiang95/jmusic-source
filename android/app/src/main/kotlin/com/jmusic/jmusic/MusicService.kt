@@ -43,6 +43,9 @@ class MusicService : Service() {
     private var spectrumData: FloatArray = FloatArray(NUM_BINS)
     private val DB_FLOOR = -60.0f
     private val DB_CEIL = 0.0f
+    // 频谱时域平滑滤波系数 (与桌面端 Rust 保持一致)
+    private val ATTACK = 0.30f
+    private val RELEASE = 0.10f
 
     // 回调接口，用于通知 Flutter 端
     var onMediaAction: ((String) -> Unit)? = null
@@ -254,6 +257,7 @@ class MusicService : Service() {
         val logMax = ln(maxFreq.toDouble()).toFloat()
 
         val output = FloatArray(NUM_BINS)
+        val lastSpectrum = spectrumData // 获取上一次的频谱数据引用，用于时域平滑
 
         for (b in 0 until NUM_BINS) {
             val freqLo = Math.exp((logMin + (logMax - logMin) * b / NUM_BINS).toDouble()).toFloat()
@@ -272,6 +276,7 @@ class MusicService : Service() {
                 count++
             }
 
+            var target = 0.0f
             if (count > 0) {
                 val avg = sum / count
                 // 将字节幅度归一化到 0~1（FFT 实/虚部为有符号字节，最大幅度约 128*sqrt(2)）
@@ -280,9 +285,15 @@ class MusicService : Service() {
                 // dB 归一化
                 val db = (20.0f * Math.log10((norm + 1e-9f).toDouble())).toFloat()
                 val clamped = db.coerceIn(DB_FLOOR, DB_CEIL)
-                output[b] = (clamped - DB_FLOOR) / (DB_CEIL - DB_FLOOR)
+                target = (clamped - DB_FLOOR) / (DB_CEIL - DB_FLOOR)
+            }
+
+            // 使用非对称 IIR 滤波器进行平滑化（平滑逻辑与桌面端 Rust 保持一致）
+            val current = if (b < lastSpectrum.size) lastSpectrum[b] else 0.0f
+            if (target > current) {
+                output[b] = current + ATTACK * (target - current)
             } else {
-                output[b] = 0.0f
+                output[b] = current + RELEASE * (target - current)
             }
         }
 
