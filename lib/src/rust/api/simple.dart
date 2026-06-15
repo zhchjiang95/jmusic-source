@@ -6,9 +6,22 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `decode_to_pcm`
+
 String greet({required String name}) =>
     RustLib.instance.api.crateApiSimpleGreet(name: name);
 
 /// 设置应用数据目录（Android 上需要从 Dart 端传入）
 void setAppDataDir({required String path}) =>
     RustLib.instance.api.crateApiSimpleSetAppDataDir(path: path);
+
+/// 音频转码导出函数，支持转换为 MP3, FLAC, WAV
+Future<void> convertAudio({
+  required String inputPath,
+  required String outputPath,
+  required String targetFormat,
+}) => RustLib.instance.api.crateApiSimpleConvertAudio(
+  inputPath: inputPath,
+  outputPath: outputPath,
+  targetFormat: targetFormat,
+);

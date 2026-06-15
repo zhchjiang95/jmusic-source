@@ -21,6 +21,7 @@ import 'package:jmusic/pages/queue_history_page.dart';
 import 'package:jmusic/pages/achievements_page.dart';
 import 'package:jmusic/providers/song_tag_provider.dart';
 import 'package:jmusic/widgets/song_tag_sheet.dart';
+import 'package:jmusic/widgets/export_dialog.dart';
 
 /// 主页 - 歌曲库列表
 class HomePage extends ConsumerStatefulWidget {
@@ -1106,6 +1107,21 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
+        PopupMenuItem(
+          value: 'export',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(
+                Icons.transform_rounded,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              const Text('音频格式转换...', style: TextStyle(fontSize: 13)),
+            ],
+          ),
+        ),
       ],
     ).then((value) {
       if (value == 'play_next') {
@@ -1134,6 +1150,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         _showEditCoverDialog(context, ref, song);
       } else if (value == 'tags') {
         SongTagSheet.show(context, song.filePath, song.title);
+      } else if (value == 'export') {
+        if (context.mounted) {
+          ExportDialog.show(context, song);
+        }
       }
     });
   }
