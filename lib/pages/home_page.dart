@@ -164,7 +164,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     final libraryState = ref.watch(libraryProvider);
     final webDavState = ref.watch(webDavProvider);
-    final playerState = ref.watch(playerProvider);
+    final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
+    final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
     final tagState = ref.watch(songTagProvider);
     final theme = Theme.of(context);
 
@@ -177,10 +178,10 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
 
     // 监听播放错误
-    ref.listen<PlayerState>(playerProvider, (prev, next) {
-      if (next.error != null && next.error != prev?.error) {
+    ref.listen<String?>(playerProvider.select((s) => s.error), (prev, next) {
+      if (next != null && next != prev) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.error!)),
+          SnackBar(content: Text(next)),
         );
       }
     });
@@ -515,10 +516,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                             ref,
                             filteredSongs,
                             libraryState,
-                            playerState,
+                            currentSong,
+                            isPlaying,
                           ),
                     // 悬浮定位按钮（右下角，仅在单曲视图下显示）
-                    if (playerState.currentSong != null && _currentViewIndex == 0)
+                    if (currentSong != null && _currentViewIndex == 0)
                       Positioned(
                         right: 16,
                         bottom: 16,
@@ -526,7 +528,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           context,
                           filteredSongs,
                           libraryState,
-                          playerState,
+                          currentSong,
                         ),
                       ),
                   ],
@@ -534,7 +536,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
 
               // 底部迷你播放栏
-              if (playerState.currentSong != null) const MiniPlayer(),
+              if (currentSong != null) const MiniPlayer(),
             ],
           ),
         ),
@@ -591,13 +593,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  /// 根据当前选中的标签渲染视图
   Widget _buildCurrentView(
     BuildContext context,
     WidgetRef ref,
     List<Song> filteredSongs,
     LibraryState libraryState,
-    PlayerState playerState,
+    Song? currentSong,
+    bool isPlaying,
   ) {
     switch (_currentViewIndex) {
       case 1:
@@ -611,7 +613,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref,
           filteredSongs,
           libraryState,
-          playerState,
+          currentSong,
+          isPlaying,
         );
     }
   }
@@ -700,14 +703,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     BuildContext context,
     List<Song> filteredSongs,
     LibraryState libraryState,
-    PlayerState playerState,
+    Song? currentSong,
   ) {
     final theme = Theme.of(context);
     final primaryColor = theme.colorScheme.primary;
 
     return GestureDetector(
       onTap: () {
-        final currentSong = playerState.currentSong;
         if (currentSong == null) return;
 
         void scrollToTarget(int index) {
@@ -823,7 +825,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetRef ref,
     List<Song> songs,
     LibraryState libraryState,
-    PlayerState playerState,
+    Song? currentSong,
+    bool isPlaying,
   ) {
     final theme = Theme.of(context);
     final dimColor = theme.colorScheme.onSurface.withValues(alpha: 0.4);
@@ -899,7 +902,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   itemBuilder: (context, index) {
                     final song = songs[index];
                     final isCurrentSong =
-                        playerState.currentSong?.filePath == song.filePath;
+                        currentSong?.filePath == song.filePath;
 
                     return GestureDetector(
                       onSecondaryTapUp: (details) {

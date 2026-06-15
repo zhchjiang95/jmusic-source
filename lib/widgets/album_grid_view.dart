@@ -68,10 +68,41 @@ class AlbumGridView extends ConsumerWidget {
 }
 
 /// 专辑卡片组件
-class _AlbumCard extends StatelessWidget {
+class _AlbumCard extends StatefulWidget {
   final AlbumModel album;
 
   const _AlbumCard({required this.album});
+
+  @override
+  State<_AlbumCard> createState() => _AlbumCardState();
+}
+
+class _AlbumCardState extends State<_AlbumCard> {
+  late Future<String?> _coverFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _coverFuture = CoverCacheService.instance.getCoverPath(
+      filePath: widget.album.representativeSong.filePath,
+      album: widget.album.name,
+      artist: widget.album.artist,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _AlbumCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.album.name != widget.album.name ||
+        oldWidget.album.artist != widget.album.artist ||
+        oldWidget.album.representativeSong.filePath != widget.album.representativeSong.filePath) {
+      _coverFuture = CoverCacheService.instance.getCoverPath(
+        filePath: widget.album.representativeSong.filePath,
+        album: widget.album.name,
+        artist: widget.album.artist,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,11 +129,7 @@ class _AlbumCard extends StatelessWidget {
                 ],
               ),
               child: FutureBuilder<String?>(
-                future: CoverCacheService.instance.getCoverPath(
-                  filePath: album.representativeSong.filePath,
-                  album: album.name,
-                  artist: album.artist,
-                ),
+                future: _coverFuture,
                 builder: (context, snapshot) {
                   final hasCover = snapshot.connectionState == ConnectionState.done &&
                       snapshot.data != null;
@@ -115,7 +142,7 @@ class _AlbumCard extends StatelessWidget {
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
-                            cacheWidth: 250, // 限制最大缓存像素以省内内存
+                            cacheWidth: 250, // 限制最大缓存像素以节省内存
                             cacheHeight: 250,
                             errorBuilder: (_, __, ___) => _buildPlaceholder(theme),
                           )
@@ -130,7 +157,7 @@ class _AlbumCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Text(
-              album.name,
+              widget.album.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -143,7 +170,7 @@ class _AlbumCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
             child: Text(
-              album.artist,
+              widget.album.artist,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
@@ -175,22 +202,43 @@ class _AlbumCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AlbumDetailSheet(album: album),
+      builder: (_) => _AlbumDetailSheet(album: widget.album),
     );
   }
 }
 
 /// 专辑详情半页弹窗
-class _AlbumDetailSheet extends ConsumerWidget {
+class _AlbumDetailSheet extends ConsumerStatefulWidget {
   final AlbumModel album;
 
-  const _AlbumDetailSheet({required this.album});
+  const _AlbumDetailSheet({super.key, required this.album});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AlbumDetailSheet> createState() => _AlbumDetailSheetState();
+}
+
+class _AlbumDetailSheetState extends ConsumerState<_AlbumDetailSheet> {
+  late Future<String?> _coverFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _coverFuture = CoverCacheService.instance.getCoverPath(
+      filePath: widget.album.representativeSong.filePath,
+      album: widget.album.name,
+      artist: widget.album.artist,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
-    final playerState = ref.watch(playerProvider);
+    
+    // 只监听关键属性，隔离 position 与 spectrum 频繁刷新
+    final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
+    final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
+    final playMode = ref.watch(playerProvider.select((s) => s.playMode));
 
     return Container(
       height: size.height * 0.8,
@@ -236,11 +284,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     ],
                   ),
                   child: FutureBuilder<String?>(
-                    future: CoverCacheService.instance.getCoverPath(
-                      filePath: album.representativeSong.filePath,
-                      album: album.name,
-                      artist: album.artist,
-                    ),
+                    future: _coverFuture,
                     builder: (context, snapshot) {
                       final hasCover = snapshot.connectionState == ConnectionState.done &&
                           snapshot.data != null;
@@ -267,7 +311,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        album.name,
+                        widget.album.name,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -278,7 +322,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        album.artist,
+                        widget.album.artist,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: theme.colorScheme.primary,
                           fontWeight: FontWeight.w500,
@@ -288,7 +332,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${album.songs.length} 首歌曲 • 时长 ${formatTotalDuration(album.totalDuration)}',
+                        '${widget.album.songs.length} 首歌曲 • 时长 ${formatTotalDuration(widget.album.totalDuration)}',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: Colors.white54,
                         ),
@@ -310,7 +354,7 @@ class _AlbumDetailSheet extends ConsumerWidget {
                   child: FilledButton.icon(
                     onPressed: () {
                       final notifier = ref.read(playerProvider.notifier);
-                      notifier.setPlaylist(album.songs);
+                      notifier.setPlaylist(widget.album.songs);
                       notifier.playSongAt(0);
                     },
                     icon: const Icon(Icons.play_arrow_rounded, size: 20),
@@ -331,10 +375,10 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     onPressed: () {
                       final notifier = ref.read(playerProvider.notifier);
                       // 设置为随机播放模式
-                      if (playerState.playMode != PlayMode.shuffle) {
+                      if (playMode != PlayMode.shuffle) {
                         notifier.togglePlayMode();
                       }
-                      notifier.setPlaylist(album.songs);
+                      notifier.setPlaylist(widget.album.songs);
                       notifier.playSongAt(0);
                     },
                     icon: const Icon(Icons.shuffle_rounded, size: 18),
@@ -358,17 +402,17 @@ class _AlbumDetailSheet extends ConsumerWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 24),
-              itemCount: album.songs.length,
+              itemCount: widget.album.songs.length,
               itemBuilder: (context, index) {
-                final song = album.songs[index];
-                final isCurrent = playerState.currentSong?.filePath == song.filePath;
+                final song = widget.album.songs[index];
+                final isCurrent = currentSong?.filePath == song.filePath;
 
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
                   leading: SizedBox(
                     width: 32,
                     child: Center(
-                      child: isCurrent && playerState.isPlaying
+                      child: isCurrent && isPlaying
                           ? _buildPlayingIndicator(theme)
                           : Text(
                               '${index + 1}',
@@ -434,9 +478,8 @@ class _AlbumDetailSheet extends ConsumerWidget {
                     ],
                   ),
                   onTap: () {
-                    // 双击或单击都可以直接播放，并且设置当前专辑为播放列表
                     final notifier = ref.read(playerProvider.notifier);
-                    notifier.setPlaylist(album.songs);
+                    notifier.setPlaylist(widget.album.songs);
                     notifier.playSongAt(index);
                   },
                 );

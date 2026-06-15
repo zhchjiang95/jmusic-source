@@ -149,7 +149,7 @@ class _ArtistCard extends StatelessWidget {
 }
 
 /// 高级歌手头像组件（支持 4 图拼贴或哈希渐变文字兜底）
-class _ArtistAvatar extends StatelessWidget {
+class _ArtistAvatar extends StatefulWidget {
   final ArtistModel artist;
   final double size;
 
@@ -159,13 +159,22 @@ class _ArtistAvatar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  State<_ArtistAvatar> createState() => _ArtistAvatarState();
+}
 
-    // 收集有封面的专辑/曲目列表作为拼贴图源 (最多 4 个)
+class _ArtistAvatarState extends State<_ArtistAvatar> {
+  late Future<List<String?>> _avatarFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _initFuture();
+  }
+
+  void _initFuture() {
     final List<Song> representativeSongs = [];
     final Set<String> keySet = {};
-    for (final song in artist.songs) {
+    for (final song in widget.artist.songs) {
       final key = '${song.album}_${song.artist}';
       if (!keySet.contains(key)) {
         keySet.add(key);
@@ -174,16 +183,32 @@ class _ArtistAvatar extends StatelessWidget {
       }
     }
 
-    return FutureBuilder<List<String?>>(
-      future: Future.wait(
-        representativeSongs.map(
-          (song) => CoverCacheService.instance.getCoverPath(
-            filePath: song.filePath,
-            album: song.album,
-            artist: song.artist,
-          ),
+    _avatarFuture = Future.wait(
+      representativeSongs.map(
+        (song) => CoverCacheService.instance.getCoverPath(
+          filePath: song.filePath,
+          album: song.album,
+          artist: song.artist,
         ),
       ),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ArtistAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.artist.name != widget.artist.name ||
+        oldWidget.artist.songs.length != widget.artist.songs.length) {
+      _initFuture();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return FutureBuilder<List<String?>>(
+      future: _avatarFuture,
       builder: (context, snapshot) {
         final List<String> validCovers = [];
         if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
@@ -198,8 +223,8 @@ class _ArtistAvatar extends StatelessWidget {
         if (validCovers.length >= 4) {
           return ClipOval(
             child: SizedBox(
-              width: size,
-              height: size,
+              width: widget.size,
+              height: widget.size,
               child: Column(
                 children: [
                   Expanded(
@@ -229,8 +254,8 @@ class _ArtistAvatar extends StatelessWidget {
           return ClipOval(
             child: Image.file(
               File(validCovers.first),
-              width: size,
-              height: size,
+              width: widget.size,
+              height: widget.size,
               fit: BoxFit.cover,
               cacheWidth: 180,
               cacheHeight: 180,
@@ -246,13 +271,13 @@ class _ArtistAvatar extends StatelessWidget {
   }
 
   Widget _buildTextAvatar(ThemeData theme) {
-    final hash = _hashString(artist.name);
+    final hash = _hashString(widget.artist.name);
     final gradient = _presetGradients[hash.abs() % _presetGradients.length];
-    final initialLetter = artist.name.isNotEmpty ? artist.name[0].toUpperCase() : "?";
+    final initialLetter = widget.artist.name.isNotEmpty ? widget.artist.name[0].toUpperCase() : "?";
 
     return Container(
-      width: size,
-      height: size,
+      width: widget.size,
+      height: widget.size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: LinearGradient(
@@ -266,7 +291,7 @@ class _ArtistAvatar extends StatelessWidget {
         initialLetter,
         style: TextStyle(
           color: Colors.white,
-          fontSize: size * 0.35,
+          fontSize: widget.size * 0.35,
           fontWeight: FontWeight.bold,
           shadows: const [
             Shadow(
@@ -291,7 +316,11 @@ class _ArtistDetailSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
-    final playerState = ref.watch(playerProvider);
+    
+    // 精细化监听，避免进度位置变化引发 rebuild
+    final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
+    final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
+    final playMode = ref.watch(playerProvider.select((s) => s.playMode));
 
     return Container(
       height: size.height * 0.85,
@@ -376,7 +405,7 @@ class _ArtistDetailSheet extends ConsumerWidget {
                   child: OutlinedButton.icon(
                     onPressed: () {
                       final notifier = ref.read(playerProvider.notifier);
-                      if (playerState.playMode != PlayMode.shuffle) {
+                      if (playMode != PlayMode.shuffle) {
                         notifier.togglePlayMode();
                       }
                       notifier.setPlaylist(artist.songs);
@@ -447,14 +476,14 @@ class _ArtistDetailSheet extends ConsumerWidget {
                   delegate: SliverChildBuilderDelegate(
                     (context, idx) {
                       final song = artist.songs[idx];
-                      final isCurrent = playerState.currentSong?.filePath == song.filePath;
+                      final isCurrent = currentSong?.filePath == song.filePath;
 
                       return ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 1),
                         leading: SizedBox(
                           width: 24,
                           child: Center(
-                            child: isCurrent && playerState.isPlaying
+                            child: isCurrent && isPlaying
                                 ? Icon(Icons.volume_up_rounded, color: theme.colorScheme.primary, size: 16)
                                 : Text(
                                     '${idx + 1}',
@@ -641,16 +670,36 @@ class _SmallAlbumCard extends StatelessWidget {
 }
 
 /// 复制一份简版 _SmallAlbumDetailSheet，保证可以在歌手页面内无缝打开对应专辑
-class _SmallAlbumDetailSheet extends ConsumerWidget {
+class _SmallAlbumDetailSheet extends ConsumerStatefulWidget {
   final AlbumModel album;
 
-  const _SmallAlbumDetailSheet({required this.album});
+  const _SmallAlbumDetailSheet({super.key, required this.album});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SmallAlbumDetailSheet> createState() => _SmallAlbumDetailSheetState();
+}
+
+class _SmallAlbumDetailSheetState extends ConsumerState<_SmallAlbumDetailSheet> {
+  late Future<String?> _coverFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _coverFuture = CoverCacheService.instance.getCoverPath(
+      filePath: widget.album.representativeSong.filePath,
+      album: widget.album.name,
+      artist: widget.album.artist,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
-    final playerState = ref.watch(playerProvider);
+    
+    // 只监听歌曲和播放状态，隔离进度更新
+    final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
+    final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
 
     return Container(
       height: size.height * 0.8,
@@ -688,11 +737,7 @@ class _SmallAlbumDetailSheet extends ConsumerWidget {
                     ],
                   ),
                   child: FutureBuilder<String?>(
-                    future: CoverCacheService.instance.getCoverPath(
-                      filePath: album.representativeSong.filePath,
-                      album: album.name,
-                      artist: album.artist,
-                    ),
+                    future: _coverFuture,
                     builder: (context, snapshot) {
                       final hasCover = snapshot.connectionState == ConnectionState.done &&
                           snapshot.data != null;
@@ -724,21 +769,21 @@ class _SmallAlbumDetailSheet extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        album.name,
+                        widget.album.name,
                         style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        album.artist,
+                        widget.album.artist,
                         style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w500, fontSize: 13),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${album.songs.length} 首歌曲',
+                        '${widget.album.songs.length} 首歌曲',
                         style: const TextStyle(color: Colors.white54, fontSize: 11),
                       ),
                     ],
@@ -755,7 +800,7 @@ class _SmallAlbumDetailSheet extends ConsumerWidget {
                   child: FilledButton.icon(
                     onPressed: () {
                       final notifier = ref.read(playerProvider.notifier);
-                      notifier.setPlaylist(album.songs);
+                      notifier.setPlaylist(widget.album.songs);
                       notifier.playSongAt(0);
                     },
                     icon: const Icon(Icons.play_arrow_rounded, size: 18),
@@ -769,17 +814,17 @@ class _SmallAlbumDetailSheet extends ConsumerWidget {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.only(bottom: 24),
-              itemCount: album.songs.length,
+              itemCount: widget.album.songs.length,
               itemBuilder: (context, index) {
-                final song = album.songs[index];
-                final isCurrent = playerState.currentSong?.filePath == song.filePath;
+                final song = widget.album.songs[index];
+                final isCurrent = currentSong?.filePath == song.filePath;
 
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 1),
                   leading: SizedBox(
                     width: 24,
                     child: Center(
-                      child: isCurrent && playerState.isPlaying
+                      child: isCurrent && isPlaying
                           ? Icon(Icons.volume_up_rounded, color: theme.colorScheme.primary, size: 14)
                           : Text(
                               '${index + 1}',
@@ -811,7 +856,7 @@ class _SmallAlbumDetailSheet extends ConsumerWidget {
                   ),
                   onTap: () {
                     final notifier = ref.read(playerProvider.notifier);
-                    notifier.setPlaylist(album.songs);
+                    notifier.setPlaylist(widget.album.songs);
                     notifier.playSongAt(index);
                   },
                 );
