@@ -190,58 +190,225 @@ class PlayerPage extends ConsumerWidget {
             icon: const Icon(Icons.keyboard_arrow_down, size: 32),
           ),
           const Spacer(),
-          // DLNA 投放按钮
+          // 更多选项入口（包含 DLNA 投放、睡前定时、歌词编辑器）
           Consumer(
             builder: (context, ref, _) {
               final isCasting = ref.watch(
                 castProvider.select((s) => s.isCasting),
               );
-              return IconButton(
-                onPressed: () => showCastSheet(context),
-                icon: Icon(
-                  isCasting ? Icons.cast_connected_rounded : Icons.cast_rounded,
-                  color: isCasting
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.white70,
-                  size: 21,
-                ),
-                tooltip: isCasting ? '正在投放' : '投放到设备',
+              final timerActive = ref.watch(
+                sleepTimerProvider.select((s) => s.isActive),
               );
-            },
-          ),
-          // 睡前定时
-          Consumer(
-            builder: (context, ref, _) {
-              final timer = ref.watch(sleepTimerProvider);
-              return IconButton(
-                onPressed: () => SleepTimerSheet.show(context),
-                icon: Icon(
-                  Icons.bedtime_outlined,
-                  color: timer.isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.white70,
-                  size: 20,
-                ),
-                tooltip: timer.isActive
-                    ? '定时 ${timer.remainingFormatted}'
-                    : '睡前定时',
-              );
-            },
-          ),
-          // 歌词编辑器入口
-          IconButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const LyricsEditorPage(),
+              final hasActiveState = isCasting || timerActive;
+
+              return Badge(
+                isLabelVisible: hasActiveState,
+                smallSize: 8,
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                child: IconButton(
+                  onPressed: () => _showMoreOptionsSheet(context, ref),
+                  icon: const Icon(
+                    Icons.more_vert_rounded,
+                    color: Colors.white70,
+                    size: 24,
+                  ),
+                  tooltip: '更多选项',
                 ),
               );
             },
-            icon: const Icon(Icons.edit_note, color: Colors.white70, size: 22),
-            tooltip: '歌词编辑器',
           ),
         ],
       ),
+    );
+  }
+
+  /// 显示“更多选项”底部抽屉菜单
+  void _showMoreOptionsSheet(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E28),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (modalContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 顶栏抓手指示条
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '更多选项',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // 1. DLNA 投放选项
+                Consumer(
+                  builder: (context, ref, _) {
+                    final isCasting = ref.watch(
+                      castProvider.select((s) => s.isCasting),
+                    );
+                    final activeDevice = ref.watch(
+                      castProvider.select((s) => s.activeDevice?.friendlyName),
+                    );
+
+                    return ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: isCasting
+                              ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          isCasting
+                              ? Icons.cast_connected_rounded
+                              : Icons.cast_rounded,
+                          color: isCasting
+                              ? theme.colorScheme.primary
+                              : Colors.white70,
+                          size: 22,
+                        ),
+                      ),
+                      title: const Text(
+                        '投放到设备',
+                        style: TextStyle(color: Colors.white, fontSize: 15),
+                      ),
+                      subtitle: Text(
+                        isCasting
+                            ? '正在投放 (${activeDevice ?? '已连接'})'
+                            : '将音乐投放到局域网电视或音箱',
+                        style: TextStyle(
+                          color: isCasting
+                              ? theme.colorScheme.primary
+                              : Colors.white38,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white38,
+                      ),
+                      onTap: () {
+                        Navigator.pop(modalContext);
+                        showCastSheet(context);
+                      },
+                    );
+                  },
+                ),
+
+                // 2. 睡前定时选项
+                Consumer(
+                  builder: (context, ref, _) {
+                    final timer = ref.watch(sleepTimerProvider);
+
+                    return ListTile(
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: timer.isActive
+                              ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                              : Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.bedtime_outlined,
+                          color: timer.isActive
+                              ? theme.colorScheme.primary
+                              : Colors.white70,
+                          size: 22,
+                        ),
+                      ),
+                      title: const Text(
+                        '睡前定时',
+                        style: TextStyle(color: Colors.white, fontSize: 15),
+                      ),
+                      subtitle: Text(
+                        timer.isActive
+                            ? '定时中 (倒计时 ${timer.remainingFormatted})'
+                            : '开启定时停止播放',
+                        style: TextStyle(
+                          color: timer.isActive
+                              ? theme.colorScheme.primary
+                              : Colors.white38,
+                          fontSize: 12,
+                        ),
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white38,
+                      ),
+                      onTap: () {
+                        Navigator.pop(modalContext);
+                        SleepTimerSheet.show(context);
+                      },
+                    );
+                  },
+                ),
+
+                // 3. 歌词编辑器选项
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.edit_note_rounded,
+                      color: Colors.white70,
+                      size: 22,
+                    ),
+                  ),
+                  title: const Text(
+                    '歌词编辑器',
+                    style: TextStyle(color: Colors.white, fontSize: 15),
+                  ),
+                  subtitle: const Text(
+                    '编辑与打轴当前歌曲的 LRC 歌词',
+                    style: TextStyle(color: Colors.white38, fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white38,
+                  ),
+                  onTap: () {
+                    Navigator.pop(modalContext);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const LyricsEditorPage(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

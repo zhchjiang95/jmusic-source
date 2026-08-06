@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/services/play_history_service.dart';
 import 'package:jmusic/src/rust/models/song.dart';
+import 'package:jmusic/widgets/playing_wave_indicator.dart';
 
 /// 播放队列与最近播放历史页面
 class QueueHistoryPage extends ConsumerStatefulWidget {
@@ -356,23 +357,44 @@ class _SongTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              // 歌曲图标
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? theme.colorScheme.primary.withValues(alpha: 0.2)
-                      : Colors.white.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  isActive ? Icons.equalizer_rounded : Icons.music_note_rounded,
-                  color: isActive
-                      ? theme.colorScheme.primary
-                      : Colors.white38,
-                  size: 18,
-                ),
+              // 歌曲图标 / 动态音波
+              Consumer(
+                builder: (context, ref, _) {
+                  final isPlaying = ref.watch(
+                    playerProvider.select((s) => s.isPlaying),
+                  );
+                  return Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? theme.colorScheme.primary.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: isActive
+                          ? Border.all(
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.3),
+                              width: 1,
+                            )
+                          : null,
+                    ),
+                    child: Center(
+                      child: isActive
+                          ? PlayingWaveIndicator(
+                              color: theme.colorScheme.primary,
+                              isPlaying: isPlaying,
+                              height: 14,
+                              width: 16,
+                            )
+                          : const Icon(
+                              Icons.music_note_rounded,
+                              color: Colors.white38,
+                              size: 18,
+                            ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(width: 12),
               // 歌曲信息

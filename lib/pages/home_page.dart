@@ -24,6 +24,7 @@ import 'package:jmusic/widgets/song_tag_sheet.dart';
 import 'package:jmusic/widgets/export_dialog.dart';
 import 'package:jmusic/widgets/album_grid_view.dart';
 import 'package:jmusic/widgets/artist_grid_view.dart';
+import 'package:jmusic/widgets/playing_wave_indicator.dart';
 
 
 /// 主页 - 歌曲库列表
@@ -904,6 +905,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     final isCurrentSong =
                         currentSong?.filePath == song.filePath;
 
+                    final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
+
                     return GestureDetector(
                       onSecondaryTapUp: (details) {
                         _showContextMenu(
@@ -937,20 +940,31 @@ class _HomePageState extends ConsumerState<HomePage> {
                               borderRadius: BorderRadius.circular(8),
                               color: isCurrentSong
                                   ? theme.colorScheme.primary.withValues(
-                                      alpha: 0.12,
+                                      alpha: 0.14,
+                                    )
+                                  : null,
+                              border: isCurrentSong
+                                  ? Border.all(
+                                      color: theme.colorScheme.primary
+                                          .withValues(alpha: 0.25),
+                                      width: 1,
                                     )
                                   : null,
                             ),
                             child: Row(
                               children: [
-                                // 序号 / 播放指示
+                                // 序号 / 动态播放音波指示器
                                 SizedBox(
                                   width: 36,
                                   child: isCurrentSong
-                                      ? Icon(
-                                          Icons.equalizer,
-                                          color: theme.colorScheme.primary,
-                                          size: 16,
+                                      ? Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: PlayingWaveIndicator(
+                                            color: theme.colorScheme.primary,
+                                            isPlaying: isPlaying,
+                                            height: 13,
+                                            width: 15,
+                                          ),
                                         )
                                       : Text(
                                           '${index + 1}',
