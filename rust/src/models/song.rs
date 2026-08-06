@@ -17,9 +17,9 @@ pub struct Song {
     pub file_size: u64,
     /// 文件格式（mp3/flac/wav 等）
     pub format: String,
-    /// QQ 音乐 songmid（在线匹配后填充）
+    /// 在线匹配标识（兼容保留）
     pub songmid: Option<String>,
-    /// QQ 音乐 albummid（在线匹配后填充）
+    /// 在线匹配专辑标识（兼容保留）
     pub albummid: Option<String>,
     /// 文件最后修改时间戳
     pub modified_at: u64,
@@ -51,23 +51,4 @@ impl Default for Library {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// QQ 音乐搜索结果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QQMusicSearchResult {
-    pub songmid: String,
-    pub songname: String,
-    pub albummid: String,
-    pub albumname: String,
-    pub singer: Vec<Singer>,
-    pub interval: u64,
-}
-
-/// 歌手信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Singer {
-    pub id: u64,
-    pub mid: String,
-    pub name: String,
 }

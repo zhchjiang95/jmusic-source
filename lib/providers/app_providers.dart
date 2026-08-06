@@ -635,12 +635,9 @@ class PlayerNotifier extends Notifier<PlayerState> {
     return await _playerChannel.invokeMethod(method, arg);
   }
 
-  /// 获取歌曲信息：优先读源文件嵌入数据，无则在线获取
+  /// 读取歌曲嵌入元数据（封面及歌词）
   Future<void> _fetchOnlineInfo(Song song) async {
-    bool hasLyrics = false;
-    bool hasCover = false;
-
-    // —— 先读源文件嵌入数据 ——
+    // —— 读取源文件嵌入封面 ——
     try {
       final embeddedCover = await rust_scanner.readEmbeddedCover(
         filePath: song.filePath,
@@ -648,10 +645,10 @@ class PlayerNotifier extends Notifier<PlayerState> {
       if (embeddedCover != null &&
           state.currentSong?.filePath == song.filePath) {
         state = state.copyWith(coverData: embeddedCover);
-        hasCover = true;
       }
     } catch (_) {}
 
+    // —— 读取源文件嵌入歌词 ——
     try {
       final embeddedLrc = await rust_scanner.readEmbeddedLyrics(
         filePath: song.filePath,
@@ -659,74 +656,6 @@ class PlayerNotifier extends Notifier<PlayerState> {
       if (embeddedLrc != null && state.currentSong?.filePath == song.filePath) {
         final lyrics = rust_metadata.parseLrcText(lrcText: embeddedLrc);
         state = state.copyWith(lyrics: lyrics, lrcText: embeddedLrc);
-        hasLyrics = true;
-      }
-    } catch (_) {}
-
-    // 如果嵌入数据已齐全，无需在线获取
-    if (hasLyrics && hasCover) return;
-
-    // —— 在线获取缺失的数据 ——
-    try {
-      var results = await rust_metadata.searchSongOnline(
-        keyword: '${song.artist} ${song.title}',
-      );
-      if (results.isEmpty) {
-        results = await rust_metadata.searchSongOnline(keyword: song.title);
-      }
-
-      if (results.isNotEmpty) {
-        final match = results.first;
-
-        // 用在线信息补全/更新当前歌曲的基本信息
-        if (state.currentSong?.filePath == song.filePath) {
-          final oldSong = state.currentSong!;
-          final artistName = match.singer.isNotEmpty
-              ? match.singer.map((s) => s.name).join('/')
-              : oldSong.artist;
-
-          final updatedSong = Song(
-            filePath: oldSong.filePath,
-            title: match.songname.isNotEmpty ? match.songname : oldSong.title,
-            artist: artistName,
-            album: match.albumname.isNotEmpty ? match.albumname : oldSong.album,
-            duration: oldSong.duration,
-            fileSize: oldSong.fileSize,
-            format: oldSong.format,
-            songmid: match.songmid,
-            albummid: match.albummid,
-            modifiedAt: oldSong.modifiedAt,
-          );
-          state = state.copyWith(currentSong: updatedSong);
-          // 在线更新了歌曲或歌手信息后，同步刷新原生托盘和窗口标题
-          NativeUtils.updateTitle('${updatedSong.title} - ${updatedSong.artist}');
-          // 同步更新系统媒体会话元数据
-          _updateMediaSessionMetadata(updatedSong);
-        }
-
-        // 歌词（嵌入数据没有时才在线获取）
-        if (!hasLyrics) {
-          try {
-            final lyrics = await rust_metadata.getLyrics(
-              songmid: match.songmid,
-            );
-            if (state.currentSong?.filePath == song.filePath) {
-              state = state.copyWith(lyrics: lyrics);
-            }
-          } catch (_) {}
-        }
-
-        // 封面（嵌入数据没有时才在线获取）
-        if (!hasCover) {
-          try {
-            final coverData = await rust_metadata.getCover(
-              albummid: match.albummid,
-            );
-            if (state.currentSong?.filePath == song.filePath) {
-              state = state.copyWith(coverData: coverData);
-            }
-          } catch (_) {}
-        }
       }
     } catch (_) {}
   }

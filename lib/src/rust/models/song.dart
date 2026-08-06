@@ -36,67 +36,6 @@ class Library {
           lastScanAt == other.lastScanAt;
 }
 
-/// QQ 音乐搜索结果
-class QQMusicSearchResult {
-  final String songmid;
-  final String songname;
-  final String albummid;
-  final String albumname;
-  final List<Singer> singer;
-  final BigInt interval;
-
-  const QQMusicSearchResult({
-    required this.songmid,
-    required this.songname,
-    required this.albummid,
-    required this.albumname,
-    required this.singer,
-    required this.interval,
-  });
-
-  @override
-  int get hashCode =>
-      songmid.hashCode ^
-      songname.hashCode ^
-      albummid.hashCode ^
-      albumname.hashCode ^
-      singer.hashCode ^
-      interval.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is QQMusicSearchResult &&
-          runtimeType == other.runtimeType &&
-          songmid == other.songmid &&
-          songname == other.songname &&
-          albummid == other.albummid &&
-          albumname == other.albumname &&
-          singer == other.singer &&
-          interval == other.interval;
-}
-
-/// 歌手信息
-class Singer {
-  final BigInt id;
-  final String mid;
-  final String name;
-
-  const Singer({required this.id, required this.mid, required this.name});
-
-  @override
-  int get hashCode => id.hashCode ^ mid.hashCode ^ name.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is Singer &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          mid == other.mid &&
-          name == other.name;
-}
-
 /// 歌曲信息
 class Song {
   /// 本地文件路径
@@ -120,10 +59,10 @@ class Song {
   /// 文件格式（mp3/flac/wav 等）
   final String format;
 
-  /// QQ 音乐 songmid（在线匹配后填充）
+  /// 在线匹配标识（兼容保留）
   final String? songmid;
 
-  /// QQ 音乐 albummid（在线匹配后填充）
+  /// 在线匹配专辑标识（兼容保留）
   final String? albummid;
 
   /// 文件最后修改时间戳

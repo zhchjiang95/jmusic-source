@@ -5,28 +5,11 @@
 
 import '../frb_generated.dart';
 import '../models/lyrics.dart';
-import '../models/song.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
-
-/// 搜索歌曲信息（通过 QQ 音乐接口）
-Future<List<QQMusicSearchResult>> searchSongOnline({required String keyword}) =>
-    RustLib.instance.api.crateApiMetadataSearchSongOnline(keyword: keyword);
-
-/// 获取歌词（在线获取）
-Future<Lyrics> getLyrics({required String songmid}) =>
-    RustLib.instance.api.crateApiMetadataGetLyrics(songmid: songmid);
 
 /// 获取网易云歌词
 Future<Lyrics> getNeteaseLyrics({required String id}) =>
     RustLib.instance.api.crateApiMetadataGetNeteaseLyrics(id: id);
-
-/// 获取专辑封面（在线下载）
-Future<Uint8List> getCover({required String albummid}) =>
-    RustLib.instance.api.crateApiMetadataGetCover(albummid: albummid);
-
-/// 获取封面 URL（不下载）
-String getCoverUrl({required String albummid}) =>
-    RustLib.instance.api.crateApiMetadataGetCoverUrl(albummid: albummid);
 
 /// 解析 LRC 文本为 Lyrics 结构
 Lyrics parseLrcText({required String lrcText}) =>

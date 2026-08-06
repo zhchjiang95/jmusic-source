@@ -63,12 +63,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
-  List<QQMusicSearchResult> dco_decode_list_qq_music_search_result(dynamic raw);
-
-  @protected
-  List<Singer> dco_decode_list_singer(dynamic raw);
-
-  @protected
   List<Song> dco_decode_list_song(dynamic raw);
 
   @protected
@@ -96,12 +90,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlayCountEntry dco_decode_play_count_entry(dynamic raw);
-
-  @protected
-  QQMusicSearchResult dco_decode_qq_music_search_result(dynamic raw);
-
-  @protected
-  Singer dco_decode_singer(dynamic raw);
 
   @protected
   Song dco_decode_song(dynamic raw);
@@ -159,14 +147,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
-  List<QQMusicSearchResult> sse_decode_list_qq_music_search_result(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  List<Singer> sse_decode_list_singer(SseDeserializer deserializer);
-
-  @protected
   List<Song> sse_decode_list_song(SseDeserializer deserializer);
 
   @protected
@@ -198,14 +178,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlayCountEntry sse_decode_play_count_entry(SseDeserializer deserializer);
-
-  @protected
-  QQMusicSearchResult sse_decode_qq_music_search_result(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  Singer sse_decode_singer(SseDeserializer deserializer);
 
   @protected
   Song sse_decode_song(SseDeserializer deserializer);
@@ -277,15 +249,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_list_qq_music_search_result(
-    List<QQMusicSearchResult> self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_list_singer(List<Singer> self, SseSerializer serializer);
-
-  @protected
   void sse_encode_list_song(List<Song> self, SseSerializer serializer);
 
   @protected
@@ -326,15 +289,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     PlayCountEntry self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_qq_music_search_result(
-    QQMusicSearchResult self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_singer(Singer self, SseSerializer serializer);
 
   @protected
   void sse_encode_song(Song self, SseSerializer serializer);

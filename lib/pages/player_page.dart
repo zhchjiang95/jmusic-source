@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -240,27 +239,6 @@ class PlayerPage extends ConsumerWidget {
             },
             icon: const Icon(Icons.edit_note, color: Colors.white70, size: 22),
             tooltip: '歌词编辑器',
-          ),
-          // 保存信息到文件
-          Consumer(
-            builder: (context, ref, _) {
-              final hasCover = ref.watch(
-                playerProvider.select((s) => s.coverData != null),
-              );
-              final hasLrc = ref.watch(
-                playerProvider.select((s) => s.lyrics != null),
-              );
-              final canSave = hasCover || hasLrc;
-              return IconButton(
-                onPressed: canSave ? () => _saveToFile(context, ref) : null,
-                icon: Icon(
-                  Icons.save_alt,
-                  color: canSave ? Colors.white : Colors.white24,
-                  size: 20,
-                ),
-                tooltip: '保存信息到文件',
-              );
-            },
           ),
         ],
       ),
@@ -823,34 +801,6 @@ class PlayerPage extends ConsumerWidget {
     final mins = d.inMinutes.toString().padLeft(2, '0');
     final secs = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$mins:$secs';
-  }
-
-  Future<void> _saveToFile(BuildContext context, WidgetRef ref) async {
-    final player = ref.read(playerProvider);
-    final song = player.currentSong;
-    if (song == null) return;
-
-    try {
-      await ref.read(libraryProvider.notifier).saveAllMetadataAndUpdate(
-            song: song,
-            lyricsText: player.lrcText,
-            coverData: player.coverData,
-          );
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已保存到源文件'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('保存失败: $e')));
-      }
-    }
   }
 }
 
