@@ -211,7 +211,7 @@ class _AlbumCardState extends State<_AlbumCard> {
 class _AlbumDetailSheet extends ConsumerStatefulWidget {
   final AlbumModel album;
 
-  const _AlbumDetailSheet({super.key, required this.album});
+  const _AlbumDetailSheet({required this.album});
 
   @override
   ConsumerState<_AlbumDetailSheet> createState() => _AlbumDetailSheetState();

@@ -673,7 +673,7 @@ class _SmallAlbumCard extends StatelessWidget {
 class _SmallAlbumDetailSheet extends ConsumerStatefulWidget {
   final AlbumModel album;
 
-  const _SmallAlbumDetailSheet({super.key, required this.album});
+  const _SmallAlbumDetailSheet({required this.album});
 
   @override
   ConsumerState<_SmallAlbumDetailSheet> createState() => _SmallAlbumDetailSheetState();

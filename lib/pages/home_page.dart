@@ -943,13 +943,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                                       alpha: 0.14,
                                     )
                                   : null,
-                              border: isCurrentSong
-                                  ? Border.all(
-                                      color: theme.colorScheme.primary
-                                          .withValues(alpha: 0.25),
-                                      width: 1,
-                                    )
-                                  : null,
                             ),
                             child: Row(
                               children: [
