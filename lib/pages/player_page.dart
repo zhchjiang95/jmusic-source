@@ -16,6 +16,7 @@ import 'package:jmusic/widgets/speed_control_sheet.dart';
 import 'package:jmusic/widgets/spectrum_view.dart';
 import 'package:jmusic/widgets/vinyl_disc.dart';
 import 'package:jmusic/providers/cast_provider.dart';
+import 'package:jmusic/providers/wakelock_provider.dart';
 
 /// 全屏播放页面
 class PlayerPage extends ConsumerWidget {
@@ -31,8 +32,9 @@ class PlayerPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final notifier = ref.read(playerProvider.notifier);
 
-    return CallbackShortcuts(
-      bindings: {
+    return KeepScreenAwake(
+      child: CallbackShortcuts(
+        bindings: {
         const SingleActivator(LogicalKeyboardKey.space): () =>
             notifier.togglePlayPause(),
         const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
@@ -110,9 +112,10 @@ class PlayerPage extends ConsumerWidget {
           ),
         ),
       ),
-      ),
-    );
-  }
+    ),
+    ),
+  );
+}
 
   /// 背景层 — 根据风格切换
   Widget _buildBackground(
@@ -982,8 +985,9 @@ class _FullScreenLyricsPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final notifier = ref.read(playerProvider.notifier);
 
-    return CallbackShortcuts(
-      bindings: {
+    return KeepScreenAwake(
+      child: CallbackShortcuts(
+        bindings: {
         const SingleActivator(LogicalKeyboardKey.space): () =>
             notifier.togglePlayPause(),
         const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
@@ -1124,6 +1128,7 @@ class _FullScreenLyricsPage extends ConsumerWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }
