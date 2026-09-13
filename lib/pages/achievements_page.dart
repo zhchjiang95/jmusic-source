@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jmusic/widgets/app_back_button.dart';
 import 'package:jmusic/services/achievement_service.dart';
 
 /// 成就系统页面
@@ -39,10 +40,8 @@ class _AchievementsPageState extends State<AchievementsPage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: const AppLeadingBackButton(),
+        leadingWidth: AppLeadingBackButton.leadingWidth,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),

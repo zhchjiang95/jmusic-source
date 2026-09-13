@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +9,7 @@ import 'package:jmusic/providers/playback_speed.dart';
 import 'package:jmusic/providers/player_style.dart';
 import 'package:jmusic/providers/sleep_timer.dart';
 import 'package:jmusic/pages/lyrics_editor_page.dart';
-import 'package:jmusic/widgets/lyrics_view.dart';
+import 'package:jmusic/pages/fullscreen_lyrics_page.dart';
 import 'package:jmusic/widgets/particles_bg.dart';
 import 'package:jmusic/widgets/cast_sheet.dart';
 import 'package:jmusic/widgets/sleep_timer_sheet.dart';
@@ -51,7 +52,7 @@ class PlayerPage extends ConsumerWidget {
             if (hasLyrics && details.velocity.pixelsPerSecond.dx < -200) {
               Navigator.of(context).push(
                 PageRouteBuilder(
-                  pageBuilder: (_, __, ___) => const _FullScreenLyricsPage(),
+                  pageBuilder: (_, __, ___) => const FullscreenLyricsPage(),
                   transitionsBuilder: (_, animation, __, child) {
                     return SlideTransition(
                       position: Tween<Offset>(
@@ -184,16 +185,42 @@ class PlayerPage extends ConsumerWidget {
 
   /// 顶部导航栏
   Widget _buildAppBar(BuildContext context, WidgetRef ref) {
+    final topPadding = Platform.isMacOS ? 12.0 : 4.0;
+    final rightPadding = Platform.isMacOS ? 16.0 : 12.0;
+
+    // 统一的圆形操作按钮样式，确保两个按钮尺寸视觉完全一致
+    final circleButtonStyle = IconButton.styleFrom(
+      fixedSize: const Size(36, 36),
+      minimumSize: const Size(36, 36),
+      padding: EdgeInsets.zero,
+      backgroundColor: Colors.white.withValues(alpha: 0.08),
+      hoverColor: Colors.white.withValues(alpha: 0.16),
+      shape: const CircleBorder(),
+    );
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.only(
+        top: topPadding,
+        right: rightPadding,
+        left: 16.0,
+      ),
       child: Row(
         children: [
+          // 左侧保持空白，完全避开 macOS 原生交通灯
+          const Spacer(),
+          // 收起播放页按钮（放置在左边）
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.keyboard_arrow_down, size: 32),
+            icon: const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Colors.white70,
+              size: 22,
+            ),
+            tooltip: '收起播放页',
+            style: circleButtonStyle,
           ),
-          const Spacer(),
-          // 更多选项入口（包含 DLNA 投放、睡前定时、歌词编辑器）
+          const SizedBox(width: 8),
+          // 更多选项入口（放置在右边）
           Consumer(
             builder: (context, ref, _) {
               final isCasting = ref.watch(
@@ -213,9 +240,10 @@ class PlayerPage extends ConsumerWidget {
                   icon: const Icon(
                     Icons.more_vert_rounded,
                     color: Colors.white70,
-                    size: 24,
+                    size: 20,
                   ),
                   tooltip: '更多选项',
+                  style: circleButtonStyle,
                 ),
               );
             },
@@ -585,7 +613,7 @@ class PlayerPage extends ConsumerWidget {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => const _FullScreenLyricsPage(),
+                builder: (_) => const FullscreenLyricsPage(),
               ),
             );
           },
@@ -971,165 +999,5 @@ class PlayerPage extends ConsumerWidget {
     final mins = d.inMinutes.toString().padLeft(2, '0');
     final secs = (d.inSeconds % 60).toString().padLeft(2, '0');
     return '$mins:$secs';
-  }
-}
-
-/// 全屏歌词页面
-class _FullScreenLyricsPage extends ConsumerWidget {
-  const _FullScreenLyricsPage();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final currentSong = ref.watch(playerProvider.select((s) => s.currentSong));
-    final isPlaying = ref.watch(playerProvider.select((s) => s.isPlaying));
-    final theme = Theme.of(context);
-    final notifier = ref.read(playerProvider.notifier);
-
-    return KeepScreenAwake(
-      child: CallbackShortcuts(
-        bindings: {
-        const SingleActivator(LogicalKeyboardKey.space): () =>
-            notifier.togglePlayPause(),
-        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-            notifier.next(),
-        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-            notifier.previous(),
-      },
-      child: Focus(
-        autofocus: true,
-        child: Scaffold(
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  theme.colorScheme.primary.withValues(alpha: 0.2),
-                  const Color(0xFF121212),
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: Stack(
-                children: [
-                  // 频谱背景（低不透明度 + 径向遮罩）
-                  Positioned.fill(
-                      child: IgnorePointer(
-                        child: ShaderMask(
-                          blendMode: BlendMode.dstIn,
-                          shaderCallback: (rect) => const RadialGradient(
-                            center: Alignment.center,
-                            radius: 0.9,
-                            colors: [Colors.white, Colors.transparent],
-                            stops: [0.55, 1.0],
-                          ).createShader(rect),
-                          child: Consumer(
-                            builder: (context, ref, _) {
-                              final spec = ref.watch(
-                                  playerProvider.select((s) => s.spectrum));
-                              return SpectrumView(
-                                spectrum: spec,
-                                opacity: 0.25,
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => Navigator.of(context).pop(),
-                              icon: const Icon(Icons.arrow_back,
-                                  color: Colors.white70),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    currentSong?.title ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    currentSong?.artist ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 12,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Expanded(child: LyricsView(isFullScreen: true)),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(32, 8, 32, 12),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            IconButton(
-                              onPressed: () =>
-                                  ref.read(playerProvider.notifier).previous(),
-                              icon: const Icon(Icons.skip_previous_rounded,
-                                  color: Colors.white70, size: 32),
-                            ),
-                            const SizedBox(width: 24),
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: theme.colorScheme.primary,
-                              ),
-                              child: IconButton(
-                                onPressed: () => ref
-                                    .read(playerProvider.notifier)
-                                    .togglePlayPause(),
-                                icon: Icon(
-                                  isPlaying
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  color: Colors.white,
-                                  size: 28,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 24),
-                            IconButton(
-                              onPressed: () =>
-                                  ref.read(playerProvider.notifier).next(),
-                              icon: const Icon(Icons.skip_next_rounded,
-                                  color: Colors.white70, size: 32),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-      ),
-    );
   }
 }

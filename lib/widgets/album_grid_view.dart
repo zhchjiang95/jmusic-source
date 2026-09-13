@@ -56,7 +56,7 @@ class AlbumGridView extends ConsumerWidget {
         maxCrossAxisExtent: 180,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.78,
+        childAspectRatio: 0.70,
       ),
       itemCount: filteredAlbums.length,
       itemBuilder: (context, index) {
@@ -152,7 +152,7 @@ class _AlbumCardState extends State<_AlbumCard> {
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           // 专辑名称
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -163,6 +163,7 @@ class _AlbumCardState extends State<_AlbumCard> {
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.onSurface,
+                height: 1.25,
               ),
             ),
           ),
@@ -175,6 +176,7 @@ class _AlbumCardState extends State<_AlbumCard> {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                height: 1.2,
               ),
             ),
           ),

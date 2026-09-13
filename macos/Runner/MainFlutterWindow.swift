@@ -14,6 +14,12 @@ class MainFlutterWindow: NSWindow {
     let y = screenFrame.origin.y + (screenFrame.height - height) / 2
     self.setFrame(NSRect(x: x, y: y, width: width, height: height), display: true)
 
+    // 隐藏系统原生标题栏背景，让内容全屏沉浸并支持背景拖拽
+    self.titleVisibility = .hidden
+    self.titlebarAppearsTransparent = true
+    self.styleMask.insert(.fullSizeContentView)
+    self.isMovableByWindowBackground = true
+
     RegisterGeneratedPlugins(registry: flutterViewController)
 
     // 把状态栏歌词控制器与窗口委托交给 AppDelegate 持有，避免在

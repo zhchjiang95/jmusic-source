@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:jmusic/widgets/app_back_button.dart';
 import 'package:jmusic/services/listening_calendar_service.dart';
 
 /// 听歌打卡日历页面 — GitHub 贡献图风格
@@ -37,10 +38,8 @@ class _ListeningCalendarPageState extends State<ListeningCalendarPage> {
             fontWeight: FontWeight.bold,
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: const AppLeadingBackButton(),
+        leadingWidth: AppLeadingBackButton.leadingWidth,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

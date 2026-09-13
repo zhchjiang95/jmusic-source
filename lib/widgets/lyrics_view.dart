@@ -134,7 +134,7 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
                 return SingleChildScrollView(
                   controller: _scrollController,
                   padding: EdgeInsets.symmetric(
-                    horizontal: 24,
+                    horizontal: widget.isFullScreen ? 36 : 24,
                     vertical: verticalPad,
                   ),
                   child: Column(
@@ -145,14 +145,16 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
 
                       final lineWidget = Container(
                         key: _keys[index],
-                        padding: const EdgeInsets.symmetric(vertical: 12.0),
+                        padding: EdgeInsets.symmetric(
+                          vertical: widget.isFullScreen ? 14.0 : 10.0,
+                        ),
                         alignment: Alignment.centerLeft,
                         child: AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 300),
                           style: TextStyle(
                             fontSize: isCurrentLine
-                                ? (widget.isFullScreen ? 20 : 18)
-                                : (widget.isFullScreen ? 16 : 15),
+                                ? (widget.isFullScreen ? 24 : 20)
+                                : (widget.isFullScreen ? 19 : 16),
                             fontWeight: isCurrentLine
                                 ? FontWeight.bold
                                 : FontWeight.normal,

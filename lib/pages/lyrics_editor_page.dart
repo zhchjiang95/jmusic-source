@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/widgets/app_back_button.dart';
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
 
 /// 歌词编辑器页面 — 手动调时间轴的 LRC 编辑器
@@ -373,6 +374,8 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
       backgroundColor: const Color(0xFF0F0F1A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A2E),
+        leading: const AppLeadingBackButton(),
+        leadingWidth: AppLeadingBackButton.leadingWidth,
         title: Text(
           '歌词编辑器${currentSong != null ? " - ${currentSong.title}" : ""}',
           style: const TextStyle(fontSize: 15),

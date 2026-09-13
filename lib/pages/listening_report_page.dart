@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:jmusic/widgets/app_back_button.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:jmusic/src/rust/api/play_stats.dart' as rust_play_stats;
 import 'package:jmusic/src/rust/api/play_stats.dart' show PlayCountEntry;
@@ -163,6 +164,8 @@ class _ListeningReportPageState extends State<ListeningReportPage> {
         backgroundColor: const Color(0xFF0F0F1A),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
+          leading: const AppLeadingBackButton(),
+          leadingWidth: AppLeadingBackButton.leadingWidth,
           title: const Text('听歌报告', style: TextStyle(fontSize: 16)),
         ),
         body: const Center(
@@ -185,6 +188,8 @@ class _ListeningReportPageState extends State<ListeningReportPage> {
       backgroundColor: const Color(0xFF0F0F1A),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        leading: const AppLeadingBackButton(),
+        leadingWidth: AppLeadingBackButton.leadingWidth,
         title: const Text('听歌报告', style: TextStyle(fontSize: 16)),
         actions: [
           IconButton(

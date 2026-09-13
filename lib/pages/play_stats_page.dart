@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jmusic/widgets/app_back_button.dart';
 import 'package:jmusic/src/rust/api/play_stats.dart' as rust_play_stats;
 
 /// 播放统计页面
@@ -20,10 +21,8 @@ class PlayStatsPage extends ConsumerWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: const AppLeadingBackButton(),
+        leadingWidth: AppLeadingBackButton.leadingWidth,
       ),
       body: stats.isEmpty
           ? Center(

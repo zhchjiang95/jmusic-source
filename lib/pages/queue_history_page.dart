@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:jmusic/widgets/app_back_button.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/services/play_history_service.dart';
 import 'package:jmusic/src/rust/models/song.dart';
@@ -42,10 +43,8 @@ class _QueueHistoryPageState extends ConsumerState<QueueHistoryPage>
             fontWeight: FontWeight.bold,
           ),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: const AppLeadingBackButton(),
+        leadingWidth: AppLeadingBackButton.leadingWidth,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

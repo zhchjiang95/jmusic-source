@@ -225,301 +225,29 @@ class _HomePageState extends ConsumerState<HomePage> {
           .toList();
     }
 
+    final leftPadding = Platform.isMacOS ? 80.0 : 16.0;
+    final topPadding = Platform.isMacOS ? 12.0 : 8.0;
+
     return Scaffold(
         body: SafeArea(
+          top: false, // 沉浸式窗口下由自定义顶栏接管顶部边距
           child: Column(
             children: [
-              // 顶部标题栏
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 12, 16, 4),
-                child: Row(
-                  children: [
-                    // Container(
-                    //   width: 36,
-                    //   height: 36,
-                    //   decoration: BoxDecoration(
-                    //     gradient: LinearGradient(
-                    //       colors: [
-                    //         theme.colorScheme.primary,
-                    //         theme.colorScheme.tertiary,
-                    //       ],
-                    //     ),
-                    //     borderRadius: BorderRadius.circular(10),
-                    //   ),
-                    //   child: const Icon(
-                    //     Icons.music_note,
-                    //     color: Colors.white,
-                    //     size: 20,
-                    //   ),
-                    // ),
-                    // const SizedBox(width: 10),
-                    // Text(
-                    //   'JMusic',
-                    //   style: theme.textTheme.titleLarge?.copyWith(
-                    //     fontWeight: FontWeight.bold,
-                    //     color: theme.colorScheme.onSurface,
-                    //   ),
-                    // ),
-                    const Spacer(),
-                    if (allSongs.isNotEmpty)
-                      Text(
-                        '${filteredSongs.length}/${allSongs.length} 首',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.5,
-                          ),
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    // 添加音乐目录（高频操作，保留）
-                    IconButton(
-                      onPressed: libraryState.isScanning
-                          ? null
-                          : () => _scanDirectory(ref),
-                      icon: libraryState.isScanning
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: theme.colorScheme.primary,
-                              ),
-                            )
-                          : Icon(
-                              Icons.folder_open,
-                              color: theme.colorScheme.primary,
-                              size: 22,
-                            ),
-                      tooltip: '添加音乐目录',
-                    ),
-                    // 更多菜单
-                    PopupMenuButton<String>(
-                      icon: Icon(
-                        Icons.more_vert,
-                        color: theme.colorScheme.primary,
-                        size: 22,
-                      ),
-                      tooltip: '更多',
-                      color: const Color(0xFF2A2A2A),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      onSelected: (value) {
-                        switch (value) {
-                          case 'queue':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const QueueHistoryPage(),
-                              ),
-                            );
-                          case 'stats':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const PlayStatsPage(),
-                              ),
-                            );
-                          case 'report':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const ListeningReportPage(),
-                              ),
-                            );
-                          case 'calendar':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const ListeningCalendarPage(),
-                              ),
-                            );
-                          case 'achievements':
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const AchievementsPage(),
-                              ),
-                            );
-                          case 'remote':
-                            WebRemoteSheet.show(context);
-                          case 'webdav':
-                            WebDavSheet.show(context);
-                          case 'settings':
-                            _showMacosSettingsDialog(context);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'queue',
-                          child: ListTile(
-                            leading: Icon(Icons.queue_music_rounded,
-                                color: Colors.white70, size: 20),
-                            title: Text('队列与历史',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'stats',
-                          child: ListTile(
-                            leading: Icon(Icons.bar_chart,
-                                color: Colors.white70, size: 20),
-                            title: Text('播放统计',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'report',
-                          child: ListTile(
-                            leading: Icon(Icons.auto_awesome,
-                                color: Colors.white70, size: 20),
-                            title: Text('听歌报告',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'calendar',
-                          child: ListTile(
-                            leading: Icon(Icons.calendar_month,
-                                color: Colors.white70, size: 20),
-                            title: Text('听歌日历',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'achievements',
-                          child: ListTile(
-                            leading: Icon(Icons.emoji_events_outlined,
-                                color: Colors.white70, size: 20),
-                            title: Text('听歌成就',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'remote',
-                          child: ListTile(
-                            leading: Icon(Icons.wifi_tethering,
-                                color: Colors.white70, size: 20),
-                            title: Text('Web 遥控',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'webdav',
-                          child: ListTile(
-                            leading: Icon(Icons.cloud_outlined,
-                                color: Colors.white70, size: 20),
-                            title: Text('WebDAV 音乐源',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 14)),
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                        if (Platform.isMacOS)
-                          const PopupMenuItem(
-                            value: 'settings',
-                            child: ListTile(
-                              leading: Icon(Icons.settings_outlined,
-                                  color: Colors.white70, size: 20),
-                              title: Text('设置',
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 14)),
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
+              // 沉浸式一体化顶栏
+              _buildUnifiedHeaderBar(
+                context: context,
+                ref: ref,
+                theme: theme,
+                libraryState: libraryState,
+                allSongs: allSongs,
+                filteredSongs: filteredSongs,
+                leftPadding: leftPadding,
+                topPadding: topPadding,
               ),
-
-              // 搜索框
-              if (allSongs.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  child: SizedBox(
-                    height: 36,
-                    child: TextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: '搜索歌曲、歌手、专辑...',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.3,
-                          ),
-                        ),
-                        prefixIcon: Icon(
-                          Icons.search,
-                          size: 18,
-                          color: theme.colorScheme.onSurface.withValues(
-                            alpha: 0.4,
-                          ),
-                        ),
-                        suffixIcon: _searchQuery.isNotEmpty
-                            ? IconButton(
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _updateSearchQuery('');
-                                  // 清除搜索后失焦，恢复全局快捷键
-                                  _searchFocusNode.unfocus();
-                                },
-                                icon: Icon(
-                                  Icons.close,
-                                  size: 16,
-                                  color: theme.colorScheme.onSurface.withValues(
-                                    alpha: 0.4,
-                                  ),
-                                ),
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              )
-                            : null,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 0,
-                          horizontal: 12,
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.onSurface.withValues(
-                          alpha: 0.06,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      onChanged: (value) {
-                        _updateSearchQuery(value);
-                      },
-                      // 回车后失焦，恢复全局快捷键
-                      onSubmitted: (_) => _searchFocusNode.unfocus(),
-                    ),
-                  ),
-                ),
-
-              // 视图切换器
-              if (allSongs.isNotEmpty) _buildViewSelector(theme),
 
               // 标签筛选栏 (仅在单曲视图下显示)
               if (allSongs.isNotEmpty && _currentViewIndex == 0)
-                _buildTagFilterBar(theme),
+                _buildTagFilterBar(theme, leftPadding),
 
               // 列表显示区域
               Expanded(
@@ -559,16 +287,323 @@ class _HomePageState extends ConsumerState<HomePage> {
       );
   }
 
+  /// 沉浸式一体化顶栏（Unified Header Bar）
+  Widget _buildUnifiedHeaderBar({
+    required BuildContext context,
+    required WidgetRef ref,
+    required ThemeData theme,
+    required LibraryState libraryState,
+    required List<Song> allSongs,
+    required List<Song> filteredSongs,
+    required double leftPadding,
+    required double topPadding,
+  }) {
+    return Padding(
+      padding: EdgeInsets.only(top: topPadding, bottom: 6),
+      child: SizedBox(
+        height: 36,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // 左右两侧功能区域
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // 左侧：交通灯避让区 + 视图切换按钮组（单曲 / 专辑 / 歌手）
+                Padding(
+                  padding: EdgeInsets.only(left: leftPadding),
+                  child: allSongs.isNotEmpty
+                      ? _buildViewSelector(theme)
+                      : const SizedBox.shrink(),
+                ),
+
+                const Spacer(),
+
+                // 右侧：歌曲统计徽章 + 扫描目录 + 更多设置
+                if (allSongs.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${filteredSongs.length}/${allSongs.length} 首',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+
+                // 扫描音乐目录按钮
+                IconButton(
+                  onPressed: libraryState.isScanning
+                      ? null
+                      : () => _scanDirectory(ref),
+                  icon: libraryState.isScanning
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: theme.colorScheme.primary,
+                          ),
+                        )
+                      : Icon(
+                          Icons.folder_open_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 20,
+                        ),
+                  tooltip: '添加音乐目录',
+                  splashRadius: 18,
+                  padding: const EdgeInsets.all(6),
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 2),
+
+                // 更多选项菜单
+                _buildMoreMenu(context, theme),
+                const SizedBox(width: 16),
+              ],
+            ),
+
+            // 中间水平绝对居中：搜索框
+            if (allSongs.isNotEmpty)
+              Center(
+                child: SizedBox(
+                  width: 280,
+                  height: 32,
+                  child: TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    style: const TextStyle(fontSize: 12.5),
+                    decoration: InputDecoration(
+                      hintText: '搜索音乐、歌手、专辑...',
+                      hintStyle: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.35),
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                _updateSearchQuery('');
+                                _searchFocusNode.unfocus();
+                              },
+                              icon: Icon(
+                                Icons.close,
+                                size: 14,
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                              ),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 0,
+                        horizontal: 10,
+                      ),
+                      filled: true,
+                      fillColor: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) => _updateSearchQuery(value),
+                    onSubmitted: (_) => _searchFocusNode.unfocus(),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 更多操作下拉菜单
+  Widget _buildMoreMenu(BuildContext context, ThemeData theme) {
+    return PopupMenuButton<String>(
+      icon: Icon(
+        Icons.more_vert_rounded,
+        color: theme.colorScheme.primary,
+        size: 20,
+      ),
+      tooltip: '更多',
+      color: const Color(0xFF2A2A2A),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      splashRadius: 18,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(),
+      onSelected: (value) {
+        switch (value) {
+          case 'queue':
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const QueueHistoryPage(),
+              ),
+            );
+          case 'stats':
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const PlayStatsPage(),
+              ),
+            );
+          case 'report':
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ListeningReportPage(),
+              ),
+            );
+          case 'calendar':
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ListeningCalendarPage(),
+              ),
+            );
+          case 'achievements':
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const AchievementsPage(),
+              ),
+            );
+          case 'remote':
+            WebRemoteSheet.show(context);
+          case 'webdav':
+            WebDavSheet.show(context);
+          case 'settings':
+            _showMacosSettingsDialog(context);
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'queue',
+          child: ListTile(
+            leading: Icon(Icons.queue_music_rounded,
+                color: Colors.white70, size: 20),
+            title: Text('队列与历史',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 14)),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'stats',
+          child: ListTile(
+            leading: Icon(Icons.bar_chart,
+                color: Colors.white70, size: 20),
+            title: Text('播放统计',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 14)),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'report',
+          child: ListTile(
+            leading: Icon(Icons.auto_awesome,
+                color: Colors.white70, size: 20),
+            title: Text('听歌报告',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 14)),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'calendar',
+          child: ListTile(
+            leading: Icon(Icons.calendar_month,
+                color: Colors.white70, size: 20),
+            title: Text('听歌日历',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 14)),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'achievements',
+          child: ListTile(
+            leading: Icon(Icons.emoji_events_outlined,
+                color: Colors.white70, size: 20),
+            title: Text('听歌成就',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 14)),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'remote',
+          child: ListTile(
+            leading: Icon(Icons.wifi_tethering,
+                color: Colors.white70, size: 20),
+            title: Text('Web 遥控',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 14)),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'webdav',
+          child: ListTile(
+            leading: Icon(Icons.cloud_outlined,
+                color: Colors.white70, size: 20),
+            title: Text('WebDAV 音乐源',
+                style: TextStyle(
+                    color: Colors.white, fontSize: 14)),
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+          ),
+        ),
+        if (Platform.isMacOS)
+          const PopupMenuItem(
+            value: 'settings',
+            child: ListTile(
+              leading: Icon(Icons.settings_outlined,
+                  color: Colors.white70, size: 20),
+              title: Text('设置',
+                  style: TextStyle(
+                      color: Colors.white, fontSize: 14)),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+      ],
+    );
+  }
+
   /// 视图切换胶囊
   Widget _buildViewSelector(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.onSurface.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+      ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           _buildSelectorTab(0, '单曲', theme),
-          const SizedBox(width: 8),
           _buildSelectorTab(1, '专辑', theme),
-          const SizedBox(width: 8),
           _buildSelectorTab(2, '歌手', theme),
         ],
       ),
@@ -583,26 +618,24 @@ class _HomePageState extends ConsumerState<HomePage> {
           _currentViewIndex = index;
         });
       },
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
         decoration: BoxDecoration(
           color: isSelected
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
+              ? theme.colorScheme.primary.withValues(alpha: 0.18)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? theme.colorScheme.primary.withValues(alpha: 0.3)
-                : Colors.white12,
-          ),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-            color: isSelected ? theme.colorScheme.primary : Colors.white70,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+            color: isSelected
+                ? theme.colorScheme.primary
+                : theme.colorScheme.onSurface.withValues(alpha: 0.65),
           ),
         ),
       ),
@@ -635,18 +668,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-
   /// 标签筛选栏
-  Widget _buildTagFilterBar(ThemeData theme) {
+  Widget _buildTagFilterBar(ThemeData theme, double leftPadding) {
     return Consumer(
       builder: (context, ref, _) {
         final tagState = ref.watch(songTagProvider);
         if (tagState.allTags.isEmpty) return const SizedBox.shrink();
 
         return SizedBox(
-          height: 36,
+          height: 32,
           child: Padding(
-            padding: const EdgeInsets.only(left: 16, bottom: 4),
+            padding: EdgeInsets.only(left: leftPadding, bottom: 4),
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
@@ -655,7 +687,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: ActionChip(
-                      avatar: const Icon(Icons.close, size: 14, color: Colors.white54),
+                      avatar: const Icon(Icons.close, size: 12, color: Colors.white54),
                       label: const Text('清除',
                           style: TextStyle(color: Colors.white54, fontSize: 11)),
                       backgroundColor: Colors.white.withValues(alpha: 0.08),
