@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
@@ -6,7 +7,7 @@ import 'package:jmusic/providers/cast_provider.dart';
 import 'package:jmusic/pages/player_page.dart';
 import 'package:jmusic/widgets/cast_sheet.dart';
 
-/// 底部迷你播放栏
+/// 底部迷你播放栏（悬浮玻璃磨砂卡片）
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
 
@@ -44,19 +45,33 @@ class MiniPlayer extends ConsumerWidget {
         );
       },
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E2E),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.primary.withValues(alpha: 0.2),
-            width: 1,
-          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+              spreadRadius: -2,
+            ),
+          ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF141420).withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 0.8,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
             // 进度条（独立 Consumer 避免重建整个组件）
             Consumer(
               builder: (context, ref, _) {
@@ -213,6 +228,9 @@ class MiniPlayer extends ConsumerWidget {
           ],
         ),
       ),
-    );
+    ),
+  ),
+),
+);
   }
 }

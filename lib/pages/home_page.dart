@@ -247,27 +247,31 @@ class _HomePageState extends ConsumerState<HomePage> {
 
               // 标签筛选栏 (仅在单曲视图下显示)
               if (allSongs.isNotEmpty && _currentViewIndex == 0)
-                _buildTagFilterBar(theme, leftPadding),
+                _buildTagFilterBar(theme),
 
-              // 列表显示区域
+              // 列表显示区域（占满底部）与悬浮控制台
               Expanded(
                 child: Stack(
                   children: [
-                    allSongs.isEmpty
-                        ? _buildEmptyState(context, ref, libraryState)
-                        : _buildCurrentView(
-                            context,
-                            ref,
-                            filteredSongs,
-                            libraryState,
-                            currentSong,
-                            isPlaying,
-                          ),
-                    // 悬浮定位按钮（右下角，仅在单曲视图下显示）
+                    // 1. 列表主体（铺满底层视口到底部）
+                    Positioned.fill(
+                      child: allSongs.isEmpty
+                          ? _buildEmptyState(context, ref, libraryState)
+                          : _buildCurrentView(
+                              context,
+                              ref,
+                              filteredSongs,
+                              libraryState,
+                              currentSong,
+                              isPlaying,
+                            ),
+                    ),
+
+                    // 2. 悬浮定位按钮（位于悬浮控制台上方的右下角，仅在单曲视图下显示）
                     if (currentSong != null && _currentViewIndex == 0)
                       Positioned(
-                        right: 16,
-                        bottom: 16,
+                        right: 20,
+                        bottom: 84,
                         child: _buildLocateButton(
                           context,
                           filteredSongs,
@@ -275,12 +279,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                           currentSong,
                         ),
                       ),
+
+                    // 3. 底部悬浮玻璃磨砂迷你播放控制台
+                    if (currentSong != null)
+                      const Positioned(
+                        left: 16,
+                        right: 16,
+                        bottom: 12,
+                        child: MiniPlayer(),
+                      ),
                   ],
                 ),
               ),
-
-              // 底部迷你播放栏
-              if (currentSong != null) const MiniPlayer(),
             ],
           ),
         ),
@@ -650,11 +660,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     Song? currentSong,
     bool isPlaying,
   ) {
+    final bottomPadding = currentSong != null ? 88.0 : 16.0;
     switch (_currentViewIndex) {
       case 1:
-        return AlbumGridView(searchQuery: _searchQuery);
+        return AlbumGridView(
+          searchQuery: _searchQuery,
+          bottomPadding: bottomPadding,
+        );
       case 2:
-        return ArtistGridView(searchQuery: _searchQuery);
+        return ArtistGridView(
+          searchQuery: _searchQuery,
+          bottomPadding: bottomPadding,
+        );
       case 0:
       default:
         return _buildSongList(
@@ -669,7 +686,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   /// 标签筛选栏
-  Widget _buildTagFilterBar(ThemeData theme, double leftPadding) {
+  Widget _buildTagFilterBar(ThemeData theme) {
     return Consumer(
       builder: (context, ref, _) {
         final tagState = ref.watch(songTagProvider);
@@ -678,7 +695,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         return SizedBox(
           height: 32,
           child: Padding(
-            padding: EdgeInsets.only(left: leftPadding, bottom: 4),
+            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
@@ -1001,7 +1018,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                     )
                   : ListView.builder(
                       controller: _scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: EdgeInsets.fromLTRB(
+                        4,
+                        0,
+                        4,
+                        currentSong != null ? 88.0 : 16.0,
+                      ),
                       itemCount: songs.length,
                       itemExtent: 44,
                       itemBuilder: (context, index) {

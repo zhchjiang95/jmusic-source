@@ -9,10 +9,12 @@ import 'package:jmusic/services/cover_cache_service.dart';
 /// 专辑网格视图
 class AlbumGridView extends ConsumerWidget {
   final String searchQuery;
+  final double bottomPadding;
 
   const AlbumGridView({
     super.key,
     required this.searchQuery,
+    this.bottomPadding = 16.0,
   });
 
   @override
@@ -51,7 +53,7 @@ class AlbumGridView extends ConsumerWidget {
     }
 
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, bottomPadding),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 180,
         mainAxisSpacing: 16,
