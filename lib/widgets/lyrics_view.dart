@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/providers/lyrics_alignment.dart';
 import 'package:jmusic/widgets/lyrics_card.dart';
 
 /// 歌词滚动显示组件
@@ -47,6 +48,7 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
     final currentMs = ref.watch(
       playerProvider.select((s) => s.position.inMilliseconds),
     );
+    final alignment = ref.watch(lyricsAlignmentProvider);
     final theme = Theme.of(context);
 
     // 当歌词对象发生变化时（例如切换歌曲），重置状态并滚动到顶部
@@ -138,23 +140,26 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
                     vertical: verticalPad,
                   ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: alignment.crossAxisAlignment,
                     children: List.generate(lyrics.lines.length, (index) {
                       final line = lyrics.lines[index];
                       final isCurrentLine = index == currentLineIndex;
 
-                      final lineWidget = Container(
+                      final lineWidget = AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOutCubic,
                         key: _keys[index],
+                        width: double.infinity,
                         padding: EdgeInsets.symmetric(
-                          vertical: widget.isFullScreen ? 14.0 : 10.0,
+                          vertical: widget.isFullScreen ? 16.0 : 12.0,
                         ),
-                        alignment: Alignment.centerLeft,
+                        alignment: alignment.containerAlignment,
                         child: AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 300),
                           style: TextStyle(
                             fontSize: isCurrentLine
-                                ? (widget.isFullScreen ? 24 : 20)
-                                : (widget.isFullScreen ? 19 : 16),
+                                ? (widget.isFullScreen ? 28 : 24)
+                                : (widget.isFullScreen ? 22 : 18),
                             fontWeight: isCurrentLine
                                 ? FontWeight.bold
                                 : FontWeight.normal,
@@ -165,7 +170,7 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
                           ),
                           child: Text(
                             line.text,
-                            textAlign: TextAlign.left,
+                            textAlign: alignment.textAlign,
                           ),
                         ),
                       );

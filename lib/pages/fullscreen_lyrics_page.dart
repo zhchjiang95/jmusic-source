@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
+import 'package:jmusic/providers/lyrics_alignment.dart';
 import 'package:jmusic/providers/wakelock_provider.dart';
 import 'package:jmusic/src/rust/models/song.dart';
 import 'package:jmusic/widgets/lyrics_view.dart';
@@ -111,6 +113,8 @@ class _FullscreenLyricsPageState extends ConsumerState<FullscreenLyricsPage> {
               notifier.previous(),
           const SingleActivator(LogicalKeyboardKey.escape): () =>
               Navigator.of(context).pop(),
+          const SingleActivator(LogicalKeyboardKey.keyA): () =>
+              ref.read(lyricsAlignmentProvider.notifier).cycle(),
         },
         child: Focus(
           autofocus: true,
@@ -128,22 +132,9 @@ class _FullscreenLyricsPageState extends ConsumerState<FullscreenLyricsPage> {
                 behavior: HitTestBehavior.translucent,
                 child: Stack(
                   children: [
-                    // 1. 动态渐变背景
+                    // 1. 虚化专辑图背景（无封面时回退到渐变背景）
                     Positioned.fill(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              theme.colorScheme.primary
-                                  .withValues(alpha: 0.22),
-                              const Color(0xFF121212),
-                              const Color(0xFF0D0D0D),
-                            ],
-                          ),
-                        ),
-                      ),
+                      child: _buildBackground(theme),
                     ),
 
                     // 2. 频谱背景（带柔和径向遮罩）
@@ -314,7 +305,38 @@ class _FullscreenLyricsPageState extends ConsumerState<FullscreenLyricsPage> {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
+          // 垂直微细分割线
+          Container(
+            width: 1,
+            height: 18,
+            color: Colors.white.withValues(alpha: 0.18),
+          ),
+          const SizedBox(width: 10),
+          // 歌词对齐方式切换按钮（居左、居中、居右）
+          Consumer(
+            builder: (context, ref, _) {
+              final alignment = ref.watch(lyricsAlignmentProvider);
+              return IconButton(
+                onPressed: () {
+                  ref.read(lyricsAlignmentProvider.notifier).cycle();
+                },
+                icon: Icon(
+                  alignment.icon,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                tooltip: '歌词对齐: ${alignment.label} (点击切换 / 按 A)',
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  hoverColor: Colors.white.withValues(alpha: 0.18),
+                  shape: const CircleBorder(),
+                  padding: const EdgeInsets.all(6),
+                  minimumSize: const Size(32, 32),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -396,6 +418,53 @@ class _FullscreenLyricsPageState extends ConsumerState<FullscreenLyricsPage> {
             tooltip: '下一首',
           ),
         ],
+      ),
+    );
+  }
+
+  /// 构建背景层 — 虚化专辑图效果（无封面时回退到默认渐变背景）
+  Widget _buildBackground(ThemeData theme) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final coverData =
+            ref.watch(playerProvider.select((s) => s.coverData));
+        if (coverData != null) {
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.memory(
+                Uint8List.fromList(coverData),
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => _buildDefaultGradientBg(theme),
+              ),
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          );
+        }
+        return _buildDefaultGradientBg(theme);
+      },
+    );
+  }
+
+  /// 默认渐变背景
+  Widget _buildDefaultGradientBg(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.22),
+            const Color(0xFF121212),
+            const Color(0xFF0D0D0D),
+          ],
+        ),
       ),
     );
   }
