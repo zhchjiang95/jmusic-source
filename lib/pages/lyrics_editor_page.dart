@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/widgets/app_back_button.dart';
+import 'package:jmusic/widgets/word_sync_dialog.dart';
 import 'package:jmusic/src/rust/api/metadata.dart' as rust_metadata;
+import 'package:jmusic/src/rust/models/lyrics.dart';
 
 /// 歌词编辑器页面 — 手动调时间轴的 LRC 编辑器
 /// 支持：逐行打轴、手动微调时间、编辑歌词文本、导入/导出 LRC
@@ -30,6 +32,9 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
   /// 全局 key 列表，用于滚动定位
   List<GlobalKey> _lineKeys = [];
 
+  /// 打轴反应延迟补偿（毫秒，人按下按键通常比人耳听到的音符慢 100~200ms）
+  int _reactionOffsetMs = 150;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +55,7 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
         return _EditableLine(
           timeMs: line.timeMs.toInt(),
           text: line.text,
+          words: line.words,
         );
       }).toList();
     } else if (playerState.lrcText != null &&
@@ -60,6 +66,7 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
         return _EditableLine(
           timeMs: line.timeMs.toInt(),
           text: line.text,
+          words: line.words,
         );
       }).toList();
     }
@@ -86,6 +93,7 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
         return _EditableLine(
           timeMs: line.timeMs.toInt(),
           text: line.text,
+          words: line.words,
         );
       }).toList();
       _lineKeys = List.generate(_lines.length, (_) => GlobalKey());
@@ -94,25 +102,39 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
     });
   }
 
-  /// 导出为 LRC 文本
+  /// 导出为 LRC 文本（支持 Enhanced 逐字 LRC 导出）
   String _exportLrc() {
     final buffer = StringBuffer();
     for (final line in _lines) {
-      final minutes = line.timeMs ~/ 60000;
-      final seconds = (line.timeMs % 60000) / 1000;
-      final timeStr =
-          '${minutes.toString().padLeft(2, '0')}:${seconds.toStringAsFixed(2).padLeft(5, '0')}';
-      buffer.writeln('[$timeStr]${line.text}');
+      final timeStr = _formatTime(line.timeMs);
+      if (line.hasWords) {
+        buffer.write('[$timeStr]');
+        for (final w in line.words!) {
+          final wordTimeStr = _formatTime(w.startMs.toInt());
+          buffer.write('<$wordTimeStr>${w.text}');
+        }
+        // 结束闭合时间戳
+        if (line.words!.isNotEmpty) {
+          final last = line.words!.last;
+          final endMs = last.startMs.toInt() + last.durationMs.toInt();
+          buffer.write('<${_formatTime(endMs)}>');
+        }
+        buffer.writeln();
+      } else {
+        buffer.writeln('[$timeStr]${line.text}');
+      }
     }
     return buffer.toString();
   }
 
-  /// 打轴：将当前播放位置设为指定行的时间戳
+  /// 打轴：将当前播放位置（扣除人耳反应延迟补偿）设为指定行的时间戳
   void _stampCurrentLine() {
     if (_currentStampIndex >= _lines.length) return;
     final position = ref.read(playerProvider).position;
+    final compensatedMs =
+        (position.inMilliseconds - _reactionOffsetMs).clamp(0, 99999999);
     setState(() {
-      _lines[_currentStampIndex].timeMs = position.inMilliseconds;
+      _lines[_currentStampIndex].timeMs = compensatedMs;
       _isDirty = true;
       _currentStampIndex++;
     });
@@ -139,9 +161,50 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
   /// 微调时间（毫秒偏移）
   void _adjustTime(int index, int deltaMs) {
     setState(() {
-      _lines[index].timeMs = (_lines[index].timeMs + deltaMs).clamp(0, 99999999);
+      final line = _lines[index];
+      line.timeMs = (line.timeMs + deltaMs).clamp(0, 99999999);
+      if (line.hasWords) {
+        line.words = line.words!.map((w) {
+          final newStart =
+              (w.startMs.toInt() + deltaMs).clamp(0, 99999999);
+          return LyricWord(
+            text: w.text,
+            startMs: BigInt.from(newStart),
+            durationMs: w.durationMs,
+          );
+        }).toList();
+      }
       _isDirty = true;
     });
+  }
+
+  /// 打开单行逐字时间戳打轴弹窗
+  Future<void> _openWordSync(int index) async {
+    final line = _lines[index];
+    final updatedWords = await showDialog<List<LyricWord>>(
+      context: context,
+      builder: (ctx) => WordSyncDialog(
+        lineText: line.text,
+        lineTimeMs: line.timeMs,
+        initialWords: line.words,
+        defaultReactionOffsetMs: _reactionOffsetMs,
+      ),
+    );
+
+    if (updatedWords != null) {
+      setState(() {
+        if (updatedWords.isEmpty) {
+          line.words = null;
+        } else {
+          line.words = updatedWords;
+          // 若行起始时间为 0，自动取第一个字的开始时间
+          if (line.timeMs == 0 && updatedWords.isNotEmpty) {
+            line.timeMs = updatedWords.first.startMs.toInt();
+          }
+        }
+        _isDirty = true;
+      });
+    }
   }
 
   /// 添加新行
@@ -172,6 +235,21 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
     });
   }
 
+  /// 复制全部歌词到剪贴板（带时间戳）
+  Future<void> _copyAllLyricsWithTimestamps() async {
+    if (_lines.isEmpty) return;
+    final lrcText = _exportLrc();
+    await Clipboard.setData(ClipboardData(text: lrcText));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('已复制完整带时间戳歌词到剪贴板'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   /// 保存歌词到文件
   Future<void> _save() async {
     final playerState = ref.read(playerProvider);
@@ -181,6 +259,11 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
     final lrcText = _exportLrc();
     try {
       await ref.read(libraryProvider.notifier).saveAllMetadataAndUpdate(
+            song: song,
+            lyricsText: lrcText,
+          );
+      // 显式同步当前播放器的内存歌词状态，确保实时生效且重新进入页面时不丢失
+      ref.read(playerProvider.notifier).updateCurrentSongLyrics(
             song: song,
             lyricsText: lrcText,
           );
@@ -272,6 +355,17 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
                 setState(() {
                   for (final line in _lines) {
                     line.timeMs = (line.timeMs + offset).clamp(0, 99999999);
+                    if (line.hasWords) {
+                      line.words = line.words!.map((w) {
+                        final newStart =
+                            (w.startMs.toInt() + offset).clamp(0, 99999999);
+                        return LyricWord(
+                          text: w.text,
+                          startMs: BigInt.from(newStart),
+                          durationMs: w.durationMs,
+                        );
+                      }).toList();
+                    }
                   }
                   _isDirty = true;
                 });
@@ -386,6 +480,12 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
             onPressed: _showImportDialog,
             icon: const Icon(Icons.file_download_outlined, size: 20),
             tooltip: '导入歌词',
+          ),
+          // 复制全部歌词（带时间戳）
+          IconButton(
+            onPressed: _lines.isNotEmpty ? _copyAllLyricsWithTimestamps : null,
+            icon: const Icon(Icons.copy_rounded, size: 20),
+            tooltip: '复制所有歌词（带时间戳）',
           ),
           // 整体偏移
           IconButton(
@@ -556,6 +656,43 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
             ),
           ),
           const SizedBox(width: 12),
+          // 打轴生理反应延迟补偿调节
+          PopupMenuButton<int>(
+            tooltip: '设置按键反应延迟补偿',
+            initialValue: _reactionOffsetMs,
+            onSelected: (val) => setState(() => _reactionOffsetMs = val),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.speed, size: 15, color: Colors.amber),
+                  const SizedBox(width: 4),
+                  Text(
+                    '补偿: -${_reactionOffsetMs}ms',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                  const Icon(Icons.arrow_drop_down, size: 14, color: Colors.white54),
+                ],
+              ),
+            ),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 0, child: Text('无补偿 (0ms)')),
+              const PopupMenuItem(value: 100, child: Text('补偿 -100ms')),
+              const PopupMenuItem(
+                value: 150,
+                child: Text('补偿 -150ms (推荐生理延迟)'),
+              ),
+              const PopupMenuItem(value: 200, child: Text('补偿 -200ms')),
+              const PopupMenuItem(value: 300, child: Text('补偿 -300ms')),
+            ],
+          ),
+          const SizedBox(width: 8),
           // 重置打轴位置
           IconButton(
             onPressed: () {
@@ -699,22 +836,63 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
           Expanded(
             child: GestureDetector(
               onTap: () => _editLineText(index),
-              child: Text(
-                line.text.isEmpty ? '(空行)' : line.text,
-                style: TextStyle(
-                  color: line.text.isEmpty
-                      ? Colors.white24
-                      : isCurrentStamp
-                          ? Colors.white
-                          : Colors.white70,
-                  fontSize: 13,
-                  fontWeight:
-                      isCurrentStamp ? FontWeight.w600 : FontWeight.normal,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  if (line.hasWords)
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        '逐字 ${line.words!.length}',
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      line.text.isEmpty ? '(空行)' : line.text,
+                      style: TextStyle(
+                        color: line.text.isEmpty
+                            ? Colors.white24
+                            : isCurrentStamp
+                                ? Colors.white
+                                : Colors.white70,
+                        fontSize: 13,
+                        fontWeight:
+                            isCurrentStamp ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
             ),
+          ),
+          // 逐字打轴快捷按钮
+          IconButton(
+            onPressed: () => _openWordSync(index),
+            icon: Icon(
+              line.hasWords
+                  ? Icons.mic_external_on_rounded
+                  : Icons.mic_external_on_outlined,
+              size: 18,
+              color: line.hasWords ? theme.colorScheme.primary : Colors.white30,
+            ),
+            tooltip: line.hasWords ? '编辑逐字时间戳' : '添加逐字打轴',
           ),
           // 操作菜单
           PopupMenuButton<String>(
@@ -723,6 +901,15 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
             constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'stamp', child: Text('设为当前时间')),
+              PopupMenuItem(
+                value: 'wordSync',
+                child: Text(line.hasWords ? '编辑逐字时间轴' : '逐字打轴'),
+              ),
+              if (line.hasWords)
+                const PopupMenuItem(
+                  value: 'clearWords',
+                  child: Text('清除逐字时间戳', style: TextStyle(color: Colors.redAccent)),
+                ),
               const PopupMenuItem(value: 'edit', child: Text('编辑文本')),
               const PopupMenuItem(value: 'add', child: Text('在下方插入')),
               const PopupMenuItem(value: 'delete', child: Text('删除此行')),
@@ -732,8 +919,19 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
               switch (action) {
                 case 'stamp':
                   final pos = ref.read(playerProvider).position;
+                  final comp = (pos.inMilliseconds - _reactionOffsetMs)
+                      .clamp(0, 99999999);
                   setState(() {
-                    _lines[index].timeMs = pos.inMilliseconds;
+                    _lines[index].timeMs = comp;
+                    _isDirty = true;
+                  });
+                  break;
+                case 'wordSync':
+                  _openWordSync(index);
+                  break;
+                case 'clearWords':
+                  setState(() {
+                    _lines[index].words = null;
                     _isDirty = true;
                   });
                   break;
@@ -854,6 +1052,13 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
 class _EditableLine {
   int timeMs;
   String text;
+  List<LyricWord>? words;
 
-  _EditableLine({required this.timeMs, required this.text});
+  _EditableLine({
+    required this.timeMs,
+    required this.text,
+    this.words,
+  });
+
+  bool get hasWords => words != null && words!.isNotEmpty;
 }

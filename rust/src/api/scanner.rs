@@ -323,9 +323,12 @@ fn save_all_metadata_impl(
     tag.set_artist(artist.clone());
     tag.set_album(album.clone());
 
-    // 歌词
+    // 歌词（先移除旧歌词，确保新歌词替换生效而非追加）
+    tag.remove_key(&ItemKey::Lyrics);
     if let Some(lrc) = &lyrics_text {
-        tag.insert(TagItem::new(ItemKey::Lyrics, ItemValue::Text(lrc.clone())));
+        if !lrc.trim().is_empty() {
+            tag.insert(TagItem::new(ItemKey::Lyrics, ItemValue::Text(lrc.clone())));
+        }
     }
 
     // 封面图
@@ -352,6 +355,26 @@ fn save_all_metadata_impl(
         song.artist = artist;
         song.album = album;
     }
+    save_library(&library)?;
+
+    Ok(())
+}
+
+/// 删除本地歌曲文件并从歌曲库中永久移除
+#[flutter_rust_bridge::frb]
+pub fn delete_song_file(file_path: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::Path;
+
+    let path = Path::new(&file_path);
+    // 如果物理文件存在，执行删除
+    if path.exists() {
+        fs::remove_file(path).map_err(|e| format!("物理文件删除失败: {}", e))?;
+    }
+
+    // 从本地歌曲库中移除该文件记录并保存
+    let mut library = load_library();
+    library.songs.retain(|s| s.file_path != file_path);
     save_library(&library)?;
 
     Ok(())

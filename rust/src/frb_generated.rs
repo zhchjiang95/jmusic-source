@@ -37,7 +37,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.11.1";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 887770946;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -257202012;
 
 // Section: executor
 
@@ -78,6 +78,39 @@ fn wire__crate__api__simple__convert_audio_impl(
                         api_output_path,
                         api_target_format,
                     )?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__scanner__delete_song_file_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "delete_song_file",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_file_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::scanner::delete_song_file(api_file_path)?;
                     Ok(output_ok)
                 })())
             }
@@ -1253,6 +1286,18 @@ impl SseDecode for Vec<crate::models::lyrics::LyricLine> {
     }
 }
 
+impl SseDecode for Vec<crate::models::lyrics::LyricWord> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = vec![];
+        for idx_ in 0..len_ {
+            ans_.push(<crate::models::lyrics::LyricWord>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::play_stats::PlayCountEntry> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1308,9 +1353,26 @@ impl SseDecode for crate::models::lyrics::LyricLine {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_timeMs = <u64>::sse_decode(deserializer);
         let mut var_text = <String>::sse_decode(deserializer);
+        let mut var_words =
+            <Option<Vec<crate::models::lyrics::LyricWord>>>::sse_decode(deserializer);
         return crate::models::lyrics::LyricLine {
             time_ms: var_timeMs,
             text: var_text,
+            words: var_words,
+        };
+    }
+}
+
+impl SseDecode for crate::models::lyrics::LyricWord {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_text = <String>::sse_decode(deserializer);
+        let mut var_startMs = <u64>::sse_decode(deserializer);
+        let mut var_durationMs = <u64>::sse_decode(deserializer);
+        return crate::models::lyrics::LyricWord {
+            text: var_text,
+            start_ms: var_startMs,
+            duration_ms: var_durationMs,
         };
     }
 }
@@ -1351,6 +1413,19 @@ impl SseDecode for Option<crate::api::media_session::MediaControlEvent> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::api::media_session::MediaControlEvent>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<Vec<crate::models::lyrics::LyricWord>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<Vec<crate::models::lyrics::LyricWord>>::sse_decode(
                 deserializer,
             ));
         } else {
@@ -1468,32 +1543,33 @@ fn pde_ffi_dispatcher_primary_impl(
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
         1 => wire__crate__api__simple__convert_audio_impl(port, ptr, rust_vec_len, data_len),
-        3 => wire__crate__api__metadata__get_netease_lyrics_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
-        26 => {
+        2 => wire__crate__api__scanner__delete_song_file_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire__crate__api__metadata__get_netease_lyrics_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__simple__init_app_impl(port, ptr, rust_vec_len, data_len),
+        27 => {
             wire__crate__api__scanner__read_embedded_cover_impl(port, ptr, rust_vec_len, data_len)
         }
-        27 => {
+        28 => {
             wire__crate__api__scanner__read_embedded_lyrics_impl(port, ptr, rust_vec_len, data_len)
         }
-        29 => wire__crate__api__cache__reset_library_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__scanner__save_all_metadata_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__scanner__scan_and_replace_library_impl(
+        30 => wire__crate__api__cache__reset_library_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__scanner__save_all_metadata_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__scanner__scan_and_replace_library_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        32 => wire__crate__api__scanner__scan_and_update_library_impl(
+        33 => wire__crate__api__scanner__scan_and_update_library_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        33 => {
+        34 => {
             wire__crate__api__scanner__scan_music_directory_impl(port, ptr, rust_vec_len, data_len)
         }
-        35 => {
+        36 => {
             wire__crate__api__scanner__update_song_metadata_impl(port, ptr, rust_vec_len, data_len)
         }
         _ => unreachable!(),
@@ -1508,46 +1584,46 @@ fn pde_ffi_dispatcher_sync_impl(
 ) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        2 => wire__crate__api__scanner__get_library_impl(ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__play_stats__get_play_count_impl(ptr, rust_vec_len, data_len),
-        5 => wire__crate__api__play_stats__get_play_stats_impl(ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__media_session__media_session_init_impl(ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__media_session__media_session_poll_event_impl(
+        3 => wire__crate__api__scanner__get_library_impl(ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__play_stats__get_play_count_impl(ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__play_stats__get_play_stats_impl(ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__simple__greet_impl(ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__media_session__media_session_init_impl(ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__media_session__media_session_poll_event_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        10 => wire__crate__api__media_session__media_session_update_metadata_impl(
+        11 => wire__crate__api__media_session__media_session_update_metadata_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        11 => wire__crate__api__media_session__media_session_update_playback_impl(
+        12 => wire__crate__api__media_session__media_session_update_playback_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        12 => wire__crate__api__media_session__media_session_update_stopped_impl(
+        13 => wire__crate__api__media_session__media_session_update_stopped_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        13 => wire__crate__api__metadata__parse_lrc_text_impl(ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__player__player_get_current_file_impl(ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__player__player_get_spectrum_impl(ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__player__player_get_volume_impl(ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__player__player_init_impl(ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__player__player_is_finished_impl(ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__player__player_pause_impl(ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__player__player_play_impl(ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__player__player_resume_impl(ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__player__player_seek_impl(ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__player__player_set_speed_impl(ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__player__player_set_volume_impl(ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__player__player_stop_impl(ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__play_stats__record_play_impl(ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__simple__set_app_data_dir_impl(ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__metadata__parse_lrc_text_impl(ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__player__player_get_current_file_impl(ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__player__player_get_spectrum_impl(ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__player__player_get_volume_impl(ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__player__player_init_impl(ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__player__player_is_finished_impl(ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__player__player_pause_impl(ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__player__player_play_impl(ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__player__player_resume_impl(ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__player__player_seek_impl(ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__player__player_set_speed_impl(ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__player__player_set_volume_impl(ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__player__player_stop_impl(ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__play_stats__record_play_impl(ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__simple__set_app_data_dir_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1579,6 +1655,7 @@ impl flutter_rust_bridge::IntoDart for crate::models::lyrics::LyricLine {
         [
             self.time_ms.into_into_dart().into_dart(),
             self.text.into_into_dart().into_dart(),
+            self.words.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -1591,6 +1668,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::models::lyrics::LyricLine>
     for crate::models::lyrics::LyricLine
 {
     fn into_into_dart(self) -> crate::models::lyrics::LyricLine {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::models::lyrics::LyricWord {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.text.into_into_dart().into_dart(),
+            self.start_ms.into_into_dart().into_dart(),
+            self.duration_ms.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::models::lyrics::LyricWord
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::models::lyrics::LyricWord>
+    for crate::models::lyrics::LyricWord
+{
+    fn into_into_dart(self) -> crate::models::lyrics::LyricWord {
         self
     }
 }
@@ -1741,6 +1840,16 @@ impl SseEncode for Vec<crate::models::lyrics::LyricLine> {
     }
 }
 
+impl SseEncode for Vec<crate::models::lyrics::LyricWord> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::models::lyrics::LyricWord>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::play_stats::PlayCountEntry> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1786,6 +1895,16 @@ impl SseEncode for crate::models::lyrics::LyricLine {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <u64>::sse_encode(self.time_ms, serializer);
         <String>::sse_encode(self.text, serializer);
+        <Option<Vec<crate::models::lyrics::LyricWord>>>::sse_encode(self.words, serializer);
+    }
+}
+
+impl SseEncode for crate::models::lyrics::LyricWord {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.text, serializer);
+        <u64>::sse_encode(self.start_ms, serializer);
+        <u64>::sse_encode(self.duration_ms, serializer);
     }
 }
 
@@ -1820,6 +1939,16 @@ impl SseEncode for Option<crate::api::media_session::MediaControlEvent> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::api::media_session::MediaControlEvent>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<Vec<crate::models::lyrics::LyricWord>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <Vec<crate::models::lyrics::LyricWord>>::sse_encode(value, serializer);
         }
     }
 }

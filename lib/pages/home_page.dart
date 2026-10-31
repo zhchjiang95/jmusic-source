@@ -1225,6 +1225,25 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
+        const PopupMenuDivider(height: 8),
+        const PopupMenuItem(
+          value: 'delete',
+          height: 36,
+          child: Row(
+            children: [
+              Icon(
+                Icons.delete_outline_rounded,
+                size: 16,
+                color: Colors.redAccent,
+              ),
+              SizedBox(width: 8),
+              Text(
+                '删除歌曲 (从本地硬盘移除)',
+                style: TextStyle(fontSize: 13, color: Colors.redAccent),
+              ),
+            ],
+          ),
+        ),
       ],
     ).then((value) {
       if (value == 'play_next') {
@@ -1257,8 +1276,110 @@ class _HomePageState extends ConsumerState<HomePage> {
         if (context.mounted) {
           ExportDialog.show(context, song);
         }
+      } else if (value == 'delete') {
+        _showDeleteConfirmDialog(context, ref, song);
       }
     });
+  }
+
+  /// 删除歌曲二次确认对话框
+  void _showDeleteConfirmDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Song song,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E2E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 22),
+            SizedBox(width: 8),
+            Text(
+              '删除歌曲',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '确定要从本地硬盘中永久删除歌曲《${song.title}》吗？',
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Text(
+                song.filePath,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '⚠️ 此操作将永久删除磁盘上的音频源文件，且无法恢复。',
+              style: TextStyle(color: Colors.redAccent, fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              try {
+                await ref.read(libraryProvider.notifier).deleteSong(song);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('已从硬盘删除歌曲: ${song.title}'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('删除失败: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('永久删除'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 查看音乐详细信息对话框

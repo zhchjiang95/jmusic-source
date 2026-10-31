@@ -679,6 +679,19 @@ class PlayerPage extends ConsumerWidget {
                   ),
                 ),
                 ListTile(
+                  leading: const Icon(Icons.language, color: Colors.white70),
+                  title: const Text(
+                    '酷歌词 - kugeci.com',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openUrl(
+                      'https://www.kugeci.com/search?q=$encoded',
+                    );
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.search, color: Colors.white70),
                   title: const Text(
                     '渠道1 - lrc.64h.cn',

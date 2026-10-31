@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:jmusic/providers/app_providers.dart';
 import 'package:jmusic/providers/lyrics_alignment.dart';
+import 'package:jmusic/widgets/karaoke_lyric_line.dart';
 import 'package:jmusic/widgets/lyrics_card.dart';
 
 /// 歌词滚动显示组件
@@ -154,24 +155,22 @@ class _LyricsViewState extends ConsumerState<LyricsView> {
                           vertical: widget.isFullScreen ? 16.0 : 12.0,
                         ),
                         alignment: alignment.containerAlignment,
-                        child: AnimatedDefaultTextStyle(
-                          duration: const Duration(milliseconds: 300),
-                          style: TextStyle(
+                        child: KaraokeLyricLine(
+                          line: line,
+                          currentMs: currentMs,
+                          isCurrentLine: isCurrentLine,
+                          textAlign: alignment.textAlign,
+                          textStyle: TextStyle(
                             fontSize: isCurrentLine
                                 ? (widget.isFullScreen ? 28 : 24)
                                 : (widget.isFullScreen ? 22 : 18),
                             fontWeight: isCurrentLine
                                 ? FontWeight.bold
                                 : FontWeight.normal,
-                            color: isCurrentLine
-                                ? theme.colorScheme.primary
-                                : Colors.white.withValues(alpha: 0.35),
                             height: 1.5,
                           ),
-                          child: Text(
-                            line.text,
-                            textAlign: alignment.textAlign,
-                          ),
+                          activeColor: theme.colorScheme.primary,
+                          inactiveColor: Colors.white.withValues(alpha: 0.35),
                         ),
                       );
 

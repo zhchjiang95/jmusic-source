@@ -412,15 +412,15 @@ class PlayerNotifier extends Notifier<PlayerState> {
     }
   }
 
-  /// 开始定时更新播放进度
+  /// 开始定时更新播放进度（100ms 周期，提供细腻平滑的进度与歌词响应）
   void _startPositionTimer() {
     _positionTimer?.cancel();
     int tickCount = 0;
-    _positionTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+    _positionTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
       // seek 期间跳过更新，防止覆盖用户设置的新位置
       if (_isSeeking) return;
       if (state.isPlaying && state.currentSong != null) {
-        final newPos = state.position + const Duration(milliseconds: 500);
+        final newPos = state.position + const Duration(milliseconds: 100);
 
         // A-B 复读循环：到达 B 点时自动跳回 A 点
         if (state.abLoopState == ABLoopState.active &&
@@ -437,17 +437,17 @@ class PlayerNotifier extends Notifier<PlayerState> {
           state = state.copyWith(position: newPos);
           // 同步更新桌面悬浮歌词
           _updateOverlayLyrics(newPos.inMilliseconds);
-          // 每 5 秒同步一次系统媒体会话的播放进度
+          // 每 5 秒同步一次系统媒体会话的播放进度 (50 ticks × 100ms = 5s)
           tickCount++;
-          if (tickCount % 10 == 0) {
+          if (tickCount % 50 == 0) {
             _updateMediaSessionPlayback(true, newPos);
           }
-          // 每 30 秒累加听歌日历时长（60 ticks × 500ms = 30s）
-          if (tickCount % 60 == 0) {
+          // 每 30 秒累加听歌日历时长（300 ticks × 100ms = 30s）
+          if (tickCount % 300 == 0) {
             ListeningCalendarService.instance.addListeningDuration(30);
           }
-          // 每 5 分钟持久化一次日历数据（600 ticks × 500ms = 5min）
-          if (tickCount % 600 == 0) {
+          // 每 5 分钟持久化一次日历数据（3000 ticks × 100ms = 5min）
+          if (tickCount % 3000 == 0) {
             ListeningCalendarService.instance.save();
           }
         }
@@ -848,6 +848,42 @@ class PlayerNotifier extends Notifier<PlayerState> {
     state = state.copyWith(queue: []);
   }
 
+  /// 从播放列表和待播队列中移除指定歌曲（并在当前播放时安全切歌或停止）
+  void removeSongFromPlayState(Song song) {
+    final newQueue =
+        state.queue.where((s) => s.filePath != song.filePath).toList();
+    final newPlaylist =
+        state.playlist.where((s) => s.filePath != song.filePath).toList();
+
+    if (state.currentSong?.filePath == song.filePath) {
+      if (newPlaylist.isNotEmpty || newQueue.isNotEmpty) {
+        state = state.copyWith(queue: newQueue, playlist: newPlaylist);
+        next();
+      } else {
+        _stopPlayback();
+        state = state.copyWith(
+          clearSong: true,
+          clearLyrics: true,
+          position: Duration.zero,
+          queue: [],
+          playlist: [],
+        );
+      }
+    } else {
+      int newIndex = state.currentIndex;
+      if (newPlaylist.isNotEmpty && state.currentSong != null) {
+        newIndex = newPlaylist
+            .indexWhere((s) => s.filePath == state.currentSong!.filePath);
+        if (newIndex == -1) newIndex = 0;
+      }
+      state = state.copyWith(
+        queue: newQueue,
+        playlist: newPlaylist,
+        currentIndex: newIndex,
+      );
+    }
+  }
+
   // ─── 播放历史 ─────────────────────────────────────────────────────────
 
   /// 获取最近播放历史
@@ -1030,6 +1066,20 @@ class LibraryNotifier extends Notifier<LibraryState> {
         lyricsText: lyricsText,
       );
     }
+  }
+
+  /// 从本地硬盘和歌曲库中彻底删除歌曲
+  Future<void> deleteSong(Song song) async {
+    // 1. 同步清理播放状态（切歌或停止）
+    ref.read(playerProvider.notifier).removeSongFromPlayState(song);
+
+    // 2. 调用 Rust 端物理删除文件并更新 library.json
+    await rust_scanner.deleteSongFile(filePath: song.filePath);
+
+    // 3. 更新 Dart 端歌曲库状态
+    final updatedSongs =
+        state.songs.where((s) => s.filePath != song.filePath).toList();
+    state = state.copyWith(songs: updatedSongs);
   }
 }
 

@@ -61,3 +61,7 @@ Future<void> saveAllMetadata({
   lyricsText: lyricsText,
   coverData: coverData,
 );
+
+/// 删除本地歌曲文件并从歌曲库中永久移除
+Future<void> deleteSongFile({required String filePath}) =>
+    RustLib.instance.api.crateApiScannerDeleteSongFile(filePath: filePath);

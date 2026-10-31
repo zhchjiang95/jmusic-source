@@ -54,6 +54,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LyricLine> dco_decode_list_lyric_line(dynamic raw);
 
   @protected
+  List<LyricWord> dco_decode_list_lyric_word(dynamic raw);
+
+  @protected
   List<PlayCountEntry> dco_decode_list_play_count_entry(dynamic raw);
 
   @protected
@@ -69,6 +72,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LyricLine dco_decode_lyric_line(dynamic raw);
 
   @protected
+  LyricWord dco_decode_lyric_word(dynamic raw);
+
+  @protected
   Lyrics dco_decode_lyrics(dynamic raw);
 
   @protected
@@ -81,6 +87,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MediaControlEvent? dco_decode_opt_box_autoadd_media_control_event(
     dynamic raw,
   );
+
+  @protected
+  List<LyricWord>? dco_decode_opt_list_lyric_word(dynamic raw);
 
   @protected
   Float32List? dco_decode_opt_list_prim_f_32_strict(dynamic raw);
@@ -136,6 +145,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LyricLine> sse_decode_list_lyric_line(SseDeserializer deserializer);
 
   @protected
+  List<LyricWord> sse_decode_list_lyric_word(SseDeserializer deserializer);
+
+  @protected
   List<PlayCountEntry> sse_decode_list_play_count_entry(
     SseDeserializer deserializer,
   );
@@ -153,6 +165,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LyricLine sse_decode_lyric_line(SseDeserializer deserializer);
 
   @protected
+  LyricWord sse_decode_lyric_word(SseDeserializer deserializer);
+
+  @protected
   Lyrics sse_decode_lyrics(SseDeserializer deserializer);
 
   @protected
@@ -167,6 +182,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   MediaControlEvent? sse_decode_opt_box_autoadd_media_control_event(
     SseDeserializer deserializer,
   );
+
+  @protected
+  List<LyricWord>? sse_decode_opt_list_lyric_word(SseDeserializer deserializer);
 
   @protected
   Float32List? sse_decode_opt_list_prim_f_32_strict(
@@ -231,6 +249,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_lyric_word(
+    List<LyricWord> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_play_count_entry(
     List<PlayCountEntry> self,
     SseSerializer serializer,
@@ -255,6 +279,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_lyric_line(LyricLine self, SseSerializer serializer);
 
   @protected
+  void sse_encode_lyric_word(LyricWord self, SseSerializer serializer);
+
+  @protected
   void sse_encode_lyrics(Lyrics self, SseSerializer serializer);
 
   @protected
@@ -269,6 +296,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_media_control_event(
     MediaControlEvent? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_list_lyric_word(
+    List<LyricWord>? self,
     SseSerializer serializer,
   );
 

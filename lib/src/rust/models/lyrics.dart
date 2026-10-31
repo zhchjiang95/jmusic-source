@@ -11,13 +11,16 @@ class LyricLine {
   /// 时间戳（毫秒）
   final BigInt timeMs;
 
-  /// 歌词文本
+  /// 歌词文本（纯净文本，移除了时间标签）
   final String text;
 
-  const LyricLine({required this.timeMs, required this.text});
+  /// 逐字时间戳列表（可选）
+  final List<LyricWord>? words;
+
+  const LyricLine({required this.timeMs, required this.text, this.words});
 
   @override
-  int get hashCode => timeMs.hashCode ^ text.hashCode;
+  int get hashCode => timeMs.hashCode ^ text.hashCode ^ words.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -25,7 +28,38 @@ class LyricLine {
       other is LyricLine &&
           runtimeType == other.runtimeType &&
           timeMs == other.timeMs &&
-          text == other.text;
+          text == other.text &&
+          words == other.words;
+}
+
+/// 单字/词时间戳
+class LyricWord {
+  /// 词/字文本
+  final String text;
+
+  /// 起始时间戳（毫秒）
+  final BigInt startMs;
+
+  /// 持续时间（毫秒）
+  final BigInt durationMs;
+
+  const LyricWord({
+    required this.text,
+    required this.startMs,
+    required this.durationMs,
+  });
+
+  @override
+  int get hashCode => text.hashCode ^ startMs.hashCode ^ durationMs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LyricWord &&
+          runtimeType == other.runtimeType &&
+          text == other.text &&
+          startMs == other.startMs &&
+          durationMs == other.durationMs;
 }
 
 /// 歌词数据
