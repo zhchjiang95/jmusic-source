@@ -22,6 +22,19 @@ class _EditableWord {
   int get endMs => startMs + durationMs;
 }
 
+/// 用于在逐字打轴弹窗中展示与编辑的单行歌词数据
+class WordSyncLineData {
+  final String text;
+  final int timeMs;
+  final List<LyricWord>? words;
+
+  WordSyncLineData({
+    required this.text,
+    required this.timeMs,
+    this.words,
+  });
+}
+
 /// 逐字时间戳编辑与打轴对话框
 ///
 /// 核心支持：
@@ -30,24 +43,41 @@ class _EditableWord {
 /// 3. 人耳反应延迟自动补偿（默认提前 150ms 记录）
 /// 4. 60 FPS 柔和羽化卡拉OK实时变色预览与进唱倒计时
 /// 5. 打轴后一键整体偏移（+/- 50ms, +/- 100ms）及单字微调
+/// 6. 支持连续多行保存并无缝进入下一行打轴
 class WordSyncDialog extends ConsumerStatefulWidget {
-  /// 当前行文本
-  final String lineText;
+  /// 当前行文本（单行兼容模式）
+  final String? lineText;
 
-  /// 当前行起始时间（毫秒）
-  final int lineTimeMs;
+  /// 当前行起始时间（毫秒，单行兼容模式）
+  final int? lineTimeMs;
 
-  /// 现有已打轴数据（若有）
+  /// 现有已打轴数据（若有，单行兼容模式）
   final List<LyricWord>? initialWords;
+
+  /// 初始打开的歌词行索引（多行连续打轴模式）
+  final int initialIndex;
+
+  /// 全部歌词行数据列表（多行连续打轴模式）
+  final List<WordSyncLineData>? lines;
+
+  /// 单行保存成功回调
+  final void Function(int index, List<LyricWord>? words)? onLineSaved;
+
+  /// 切换当前活动行回调（通知父页面同步高亮并滚动）
+  final void Function(int index)? onActiveLineChanged;
 
   /// 默认反应延迟补偿量（毫秒）
   final int defaultReactionOffsetMs;
 
   const WordSyncDialog({
     super.key,
-    required this.lineText,
-    required this.lineTimeMs,
+    this.lineText,
+    this.lineTimeMs,
     this.initialWords,
+    this.initialIndex = 0,
+    this.lines,
+    this.onLineSaved,
+    this.onActiveLineChanged,
     this.defaultReactionOffsetMs = 150,
   });
 
@@ -57,6 +87,8 @@ class WordSyncDialog extends ConsumerStatefulWidget {
 
 class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
     with SingleTickerProviderStateMixin {
+  late List<WordSyncLineData> _localLines;
+  late int _currentIndex;
   late List<_EditableWord> _words;
   late int _reactionOffsetMs;
   int _activeWordIndex = 0;
@@ -70,8 +102,22 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
   @override
   void initState() {
     super.initState();
+    if (widget.lines != null && widget.lines!.isNotEmpty) {
+      _localLines = List.from(widget.lines!);
+      _currentIndex = widget.initialIndex.clamp(0, _localLines.length - 1);
+    } else {
+      _localLines = [
+        WordSyncLineData(
+          text: widget.lineText ?? '',
+          timeMs: widget.lineTimeMs ?? 0,
+          words: widget.initialWords,
+        ),
+      ];
+      _currentIndex = 0;
+    }
+
     _reactionOffsetMs = widget.defaultReactionOffsetMs;
-    _initWords();
+    _loadLine(_currentIndex);
 
     _ticker = createTicker(_onTick)..start();
   }
@@ -98,10 +144,12 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
     super.dispose();
   }
 
-  /// 初始化分词列表
-  void _initWords() {
-    if (widget.initialWords != null && widget.initialWords!.isNotEmpty) {
-      _words = widget.initialWords!.map((w) {
+  /// 加载指定行的分词及打轴数据
+  void _loadLine(int index) {
+    if (index < 0 || index >= _localLines.length) return;
+    final lineData = _localLines[index];
+    if (lineData.words != null && lineData.words!.isNotEmpty) {
+      _words = lineData.words!.map((w) {
         return _EditableWord(
           text: w.text,
           startMs: w.startMs.toInt(),
@@ -112,7 +160,7 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
       _activeWordIndex = 0;
     } else {
       // 智能分词：汉字单独切分，连续英文字母/数字切为一个词
-      _words = _splitWords(widget.lineText).map((t) {
+      _words = _splitWords(lineData.text).map((t) {
         return _EditableWord(text: t, isStamped: false);
       }).toList();
       _activeWordIndex = 0;
@@ -228,9 +276,10 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
 
   /// 从本行起播试听（往前提前 2 秒缓冲准备）
   void _playFromStart() {
+    final currentLine = _localLines[_currentIndex];
     final startTime = _words.isNotEmpty && _words.first.isStamped
         ? _words.first.startMs
-        : widget.lineTimeMs;
+        : currentLine.timeMs;
     // 默认往前提前 2000ms（2秒），让人耳有充分前奏准备时间
     final targetSeekMs = (startTime - 2000).clamp(0, 99999999);
     ref.read(playerProvider.notifier).seekTo(Duration(milliseconds: targetSeekMs));
@@ -238,6 +287,49 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
       ref.read(playerProvider.notifier).togglePlayPause();
     }
     _focusNode.requestFocus();
+  }
+
+  /// 保存处理逻辑
+  /// [continueNext]: 是否在保存当前行后自动进入下一行继续打轴
+  void _handleSave({required bool continueNext}) {
+    final hasAnyStamped = _words.any((w) => w.isStamped);
+    final savedWords = hasAnyStamped ? _collectWords() : <LyricWord>[];
+    final wordsToSave = savedWords.isEmpty ? null : savedWords;
+
+    // 更新本地行数据记录
+    final currentLine = _localLines[_currentIndex];
+    final calculatedTimeMs = currentLine.timeMs == 0 && savedWords.isNotEmpty
+        ? savedWords.first.startMs.toInt()
+        : currentLine.timeMs;
+
+    _localLines[_currentIndex] = WordSyncLineData(
+      text: currentLine.text,
+      timeMs: calculatedTimeMs,
+      words: wordsToSave,
+    );
+
+    // 触发保存回调
+    widget.onLineSaved?.call(_currentIndex, wordsToSave);
+
+    if (continueNext && _currentIndex < _localLines.length - 1) {
+      setState(() {
+        _currentIndex++;
+        _loadLine(_currentIndex);
+      });
+      widget.onActiveLineChanged?.call(_currentIndex);
+      _focusNode.requestFocus();
+
+      // 若下一行已有起始时间戳（> 0），自动提前 2 秒起播进入预备状态
+      final nextLine = _localLines[_currentIndex];
+      final nextStartTime = _words.isNotEmpty && _words.first.isStamped
+          ? _words.first.startMs
+          : nextLine.timeMs;
+      if (nextStartTime > 0) {
+        _playFromStart();
+      }
+    } else {
+      Navigator.of(context).pop(savedWords);
+    }
   }
 
   /// 转换为 LyricWord 列表
@@ -277,10 +369,11 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
 
     final currentPosMs = _smoothCurrentMs;
 
+    final currentLine = _localLines[_currentIndex];
     // 计算首字开始时间
     final firstStartMs = _words.isNotEmpty && _words.first.isStamped
         ? _words.first.startMs
-        : widget.lineTimeMs;
+        : currentLine.timeMs;
     final isPreparing = isPlaying && currentPosMs < firstStartMs;
     final prepareCountdown =
         ((firstStartMs - currentPosMs) / 1000.0).clamp(0.0, 9.9);
@@ -314,9 +407,11 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
                     size: 22,
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    '逐字时间戳编辑与打轴',
-                    style: TextStyle(
+                  Text(
+                    _localLines.length > 1
+                        ? '逐字时间戳编辑与打轴 (${_currentIndex + 1}/${_localLines.length})'
+                        : '逐字时间戳编辑与打轴',
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -810,16 +905,16 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
                     child: const Text('取消'),
                   ),
                   const SizedBox(width: 12),
+                  FilledButton.tonal(
+                    onPressed: () => _handleSave(continueNext: false),
+                    child: const Text('保存'),
+                  ),
+                  const SizedBox(width: 12),
                   FilledButton(
-                    onPressed: () {
-                      final hasAnyStamped = _words.any((w) => w.isStamped);
-                      if (hasAnyStamped) {
-                        Navigator.of(context).pop(_collectWords());
-                      } else {
-                        Navigator.of(context).pop(<LyricWord>[]);
-                      }
-                    },
-                    child: const Text('应用并保存此行逐字轴'),
+                    onPressed: _currentIndex < _localLines.length - 1
+                        ? () => _handleSave(continueNext: true)
+                        : null,
+                    child: const Text('保存并继续下一行歌词'),
                   ),
                 ],
               ),

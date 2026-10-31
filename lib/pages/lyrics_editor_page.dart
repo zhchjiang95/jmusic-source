@@ -178,33 +178,43 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
     });
   }
 
-  /// 打开单行逐字时间戳打轴弹窗
+  /// 打开逐字时间戳打轴弹窗（支持多行连续打轴）
   Future<void> _openWordSync(int index) async {
-    final line = _lines[index];
-    final updatedWords = await showDialog<List<LyricWord>>(
+    await showDialog<List<LyricWord>>(
       context: context,
       builder: (ctx) => WordSyncDialog(
-        lineText: line.text,
-        lineTimeMs: line.timeMs,
-        initialWords: line.words,
+        initialIndex: index,
+        lines: _lines
+            .map((l) => WordSyncLineData(
+                  text: l.text,
+                  timeMs: l.timeMs,
+                  words: l.words,
+                ))
+            .toList(),
         defaultReactionOffsetMs: _reactionOffsetMs,
+        onActiveLineChanged: (newIdx) {
+          setState(() {
+            _currentStampIndex = newIdx;
+            _scrollToIndex(newIdx);
+          });
+        },
+        onLineSaved: (lineIdx, updatedWords) {
+          setState(() {
+            final targetLine = _lines[lineIdx];
+            if (updatedWords == null || updatedWords.isEmpty) {
+              targetLine.words = null;
+            } else {
+              targetLine.words = updatedWords;
+              // 若行起始时间为 0，自动取第一个字的开始时间
+              if (targetLine.timeMs == 0 && updatedWords.isNotEmpty) {
+                targetLine.timeMs = updatedWords.first.startMs.toInt();
+              }
+            }
+            _isDirty = true;
+          });
+        },
       ),
     );
-
-    if (updatedWords != null) {
-      setState(() {
-        if (updatedWords.isEmpty) {
-          line.words = null;
-        } else {
-          line.words = updatedWords;
-          // 若行起始时间为 0，自动取第一个字的开始时间
-          if (line.timeMs == 0 && updatedWords.isNotEmpty) {
-            line.timeMs = updatedWords.first.startMs.toInt();
-          }
-        }
-        _isDirty = true;
-      });
-    }
   }
 
   /// 添加新行
