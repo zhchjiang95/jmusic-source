@@ -92,5 +92,69 @@ void main() {
       expect(savedLines.containsKey(1), isTrue);
       expect(find.text('逐字时间戳编辑与打轴 (2/2)'), findsNothing);
     });
+
+    testWidgets('逐字打轴首字时间自动同步为整句歌词起始时间', (WidgetTester tester) async {
+      int lineTime = 1000;
+      List<LyricWord>? savedWords;
+
+      // 现有初始打轴数据，首字打轴在 2340ms（与原有 lineTime 1000ms 存在误差）
+      final initialWords = [
+        LyricWord(text: '天', startMs: BigInt.from(2340), durationMs: BigInt.from(300)),
+        LyricWord(text: '青', startMs: BigInt.from(2640), durationMs: BigInt.from(300)),
+      ];
+
+      final lines = [
+        WordSyncLineData(
+          text: '天青',
+          timeMs: lineTime,
+          words: initialWords,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  return ElevatedButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => WordSyncDialog(
+                          initialIndex: 0,
+                          lines: lines,
+                          onLineSaved: (idx, words) {
+                            savedWords = words;
+                            if (words != null && words.isNotEmpty) {
+                              lineTime = words.first.startMs.toInt();
+                            }
+                          },
+                        ),
+                      );
+                    },
+                    child: const Text('打开打轴'),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('打开打轴'));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // 点击保存
+      final saveBtnFinder = find.widgetWithText(FilledButton, '保存');
+      await tester.tap(saveBtnFinder);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(savedWords, isNotNull);
+      expect(savedWords!.first.startMs.toInt(), 2340);
+      // 验证整句歌词时间已被首字更精准的时间戳自动校准覆盖
+      expect(lineTime, 2340);
+    });
   });
 }

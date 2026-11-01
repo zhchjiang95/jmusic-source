@@ -205,10 +205,8 @@ class _LyricsEditorPageState extends ConsumerState<LyricsEditorPage> {
               targetLine.words = null;
             } else {
               targetLine.words = updatedWords;
-              // 若行起始时间为 0，自动取第一个字的开始时间
-              if (targetLine.timeMs == 0 && updatedWords.isNotEmpty) {
-                targetLine.timeMs = updatedWords.first.startMs.toInt();
-              }
+              // 逐字打轴首字时间更精准，自动同步为整句歌词的起始时间
+              targetLine.timeMs = updatedWords.first.startMs.toInt();
             }
             _isDirty = true;
           });

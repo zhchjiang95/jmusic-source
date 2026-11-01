@@ -296,9 +296,9 @@ class _WordSyncDialogState extends ConsumerState<WordSyncDialog>
     final savedWords = hasAnyStamped ? _collectWords() : <LyricWord>[];
     final wordsToSave = savedWords.isEmpty ? null : savedWords;
 
-    // 更新本地行数据记录
+    // 更新本地行数据记录（首字时间更精准，若已打轴则自动同步为整行起始时间）
     final currentLine = _localLines[_currentIndex];
-    final calculatedTimeMs = currentLine.timeMs == 0 && savedWords.isNotEmpty
+    final calculatedTimeMs = (savedWords.isNotEmpty && _words.first.isStamped)
         ? savedWords.first.startMs.toInt()
         : currentLine.timeMs;
 
