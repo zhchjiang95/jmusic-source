@@ -86,12 +86,14 @@ class WakelockNotifier extends Notifier<WakelockState> {
 
   /// 页面或组件进入活跃状态，申请常亮引用
   void acquire() {
+    if (!ref.mounted) return;
     state = state.copyWith(activeCount: state.activeCount + 1);
     _syncWakelock();
   }
 
   /// 页面或组件退出活跃状态，释放常亮引用
   void release() {
+    if (!ref.mounted) return;
     final newCount = (state.activeCount - 1).clamp(0, 9999);
     state = state.copyWith(activeCount: newCount);
     _syncWakelock();

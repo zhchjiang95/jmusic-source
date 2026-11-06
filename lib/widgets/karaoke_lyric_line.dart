@@ -145,6 +145,9 @@ class _KaraokeLyricLineState extends State<KaraokeLyricLine>
       _ => WrapAlignment.center,
     };
 
+    // 确保逐字渲染时不携带文本阴影，防止 ShaderMask 对单字矩形边界裁剪阴影产生半透明暗块
+    final baseStyle = widget.textStyle.copyWith(shadows: const []);
+
     return Wrap(
       alignment: wrapAlignment,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -157,7 +160,7 @@ class _KaraokeLyricLineState extends State<KaraokeLyricLine>
         if (displayMs >= endMs) {
           return Text(
             w.text,
-            style: widget.textStyle.copyWith(color: widget.activeColor),
+            style: baseStyle.copyWith(color: widget.activeColor),
           );
         }
 
@@ -165,7 +168,7 @@ class _KaraokeLyricLineState extends State<KaraokeLyricLine>
         if (displayMs < startMs) {
           return Text(
             w.text,
-            style: widget.textStyle.copyWith(color: widget.inactiveColor),
+            style: baseStyle.copyWith(color: widget.inactiveColor),
           );
         }
 
@@ -178,9 +181,6 @@ class _KaraokeLyricLineState extends State<KaraokeLyricLine>
         final startStop = (progress - feather).clamp(0.0, 1.0);
         final endStop = (progress + feather).clamp(0.0, 1.0);
 
-        // 正在唱的边缘高亮提亮色，呈现细腻的卡拉OK光泽微晕
-        final glowColor = Color.lerp(widget.activeColor, Colors.white, 0.45)!;
-
         return ShaderMask(
           blendMode: BlendMode.srcIn,
           shaderCallback: (Rect bounds) {
@@ -190,14 +190,12 @@ class _KaraokeLyricLineState extends State<KaraokeLyricLine>
               stops: [
                 0.0,
                 startStop,
-                progress,
                 endStop,
                 1.0,
               ],
               colors: [
                 widget.activeColor,
                 widget.activeColor,
-                glowColor,            // 扫光边缘发光微晕
                 widget.inactiveColor,
                 widget.inactiveColor,
               ],
@@ -205,7 +203,7 @@ class _KaraokeLyricLineState extends State<KaraokeLyricLine>
           },
           child: Text(
             w.text,
-            style: widget.textStyle.copyWith(color: Colors.white),
+            style: baseStyle.copyWith(color: Colors.white),
           ),
         );
       }).toList(),
