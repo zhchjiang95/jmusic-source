@@ -299,14 +299,19 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          // 声学频谱进度与主控舱（常驻显示，不自动隐藏）
-                          _buildAcousticControlDeck(
-                            context: context,
-                            ref: ref,
-                            isPlaying: isPlaying,
-                            playMode: playMode,
-                            volume: volume,
-                            theme: theme,
+                          // 声学频谱进度与主控舱（常驻显示，鼠标静止隐藏顶部按钮时透明度同步降为 0.6）
+                          AnimatedOpacity(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeOutCubic,
+                            opacity: _controlsVisible ? 1.0 : 0.3,
+                            child: _buildAcousticControlDeck(
+                              context: context,
+                              ref: ref,
+                              isPlaying: isPlaying,
+                              playMode: playMode,
+                              volume: volume,
+                              theme: theme,
+                            ),
                           ),
                         ],
                       ),
@@ -479,15 +484,20 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
             ),
           ),
           const SizedBox(height: 10),
-          // 底部声学控制舱（常驻显示，不自动隐藏）
-          _buildAcousticControlDeck(
-            context: context,
-            ref: ref,
-            isPlaying: isPlaying,
-            playMode: playMode,
-            volume: volume,
-            theme: theme,
-            isCompact: true,
+          // 底部声学控制舱（常驻显示，鼠标静止隐藏顶部按钮时透明度同步降为 0.6）
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            opacity: _controlsVisible ? 1.0 : 0.3,
+            child: _buildAcousticControlDeck(
+              context: context,
+              ref: ref,
+              isPlaying: isPlaying,
+              playMode: playMode,
+              volume: volume,
+              theme: theme,
+              isCompact: true,
+            ),
           ),
         ],
       ),
@@ -843,76 +853,95 @@ class _PlayerPageState extends ConsumerState<PlayerPage> {
           ),
           const SizedBox(height: 6),
 
-          // 3. 歌手名与快捷搜索歌词入口（搜索歌词按钮随无操作自动淡出隐藏）
-          Wrap(
-            spacing: 12,
-            runSpacing: 6,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            alignment: switch (crossAlign) {
-              CrossAxisAlignment.center => WrapAlignment.center,
-              CrossAxisAlignment.end => WrapAlignment.end,
-              _ => WrapAlignment.start,
-            },
-            children: [
-              Text(
-                currentSong?.artist ?? '未知艺术家',
-                style: TextStyle(
-                  fontSize: isCompact ? 13.5 : 15.5,
-                  color: Colors.white.withValues(alpha: 0.65),
-                  fontWeight: FontWeight.w500,
+          // 3. 歌手名与快捷搜索歌词入口（搜索歌词按钮随无操作自动淡出并释放水平占位）
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 24),
+            child: Wrap(
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: switch (crossAlign) {
+                CrossAxisAlignment.center => WrapAlignment.center,
+                CrossAxisAlignment.end => WrapAlignment.end,
+                _ => WrapAlignment.start,
+              },
+              children: [
+                Text(
+                  currentSong?.artist ?? '未知艺术家',
+                  textAlign: textAlign,
+                  style: TextStyle(
+                    fontSize: isCompact ? 13.5 : 15.5,
+                    color: Colors.white.withValues(alpha: 0.65),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              if (currentSong != null &&
-                  (currentSong.title as String).isNotEmpty)
-                IgnorePointer(
-                  ignoring: !_controlsVisible,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 280),
-                    opacity: _controlsVisible ? 1.0 : 0.0,
-                    child: InkWell(
-                      onTap: () => _showSearchLyricsOptions(
-                        context,
-                        currentSong.title,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.14),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.search_rounded,
-                              size: 12,
-                              color: Colors.white.withValues(alpha: 0.6),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '搜索歌词',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.6),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
+                if (currentSong != null &&
+                    (currentSong.title as String).isNotEmpty)
+                  IgnorePointer(
+                    ignoring: !_controlsVisible,
+                    child: ClipRect(
+                      child: AnimatedAlign(
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.centerLeft,
+                        widthFactor: _controlsVisible ? 1.0 : 0.0,
+                        heightFactor: 1.0,
+                        child: AnimatedOpacity(
+                          duration: const Duration(milliseconds: 240),
+                          opacity: _controlsVisible ? 1.0 : 0.0,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: InkWell(
+                              onTap: () => _showSearchLyricsOptions(
+                                context,
+                                currentSong.title,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.14),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.search_rounded,
+                                      size: 12,
+                                      color: Colors.white.withValues(
+                                        alpha: 0.6,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '搜索歌词',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
